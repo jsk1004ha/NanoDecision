@@ -2,13 +2,15 @@ import os
 import sys
 from setuptools import setup, Extension
 
-windows = sys.platform == "win32"
-use_blas = os.environ.get("ND2_BLAS") == "1"
-args = ["/std:c++17", "/O2"] if windows else ["-std=c++17", "-O3", "-ffp-contract=off", "-Wno-misleading-indentation"]
-macros = [("ND2_USE_BLAS", "1")] if use_blas else []
-libraries = ["blas"] if use_blas else []
+# The default kernel has no external libraries. Opt into system BLAS explicitly.
+blas = os.environ.get("ND2_BLAS", "0") == "1"
+if os.name == "nt":
+    args = ["/std:c++17", "/O2", "/EHsc"]
+else:
+    args = ["-std=c++17", "-O3", "-ffp-contract=off"]
 setup(ext_modules=[Extension(
     "nanodecision2._native", ["native/python_module.cpp"],
-    include_dirs=["native"], define_macros=macros, libraries=libraries,
-    language="c++", extra_compile_args=args,
+    include_dirs=["native"], language="c++", extra_compile_args=args,
+    define_macros=[("ND2_USE_BLAS", "1")] if blas else [],
+    libraries=["blas"] if blas else [],
 )])

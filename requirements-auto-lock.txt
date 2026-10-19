@@ -1,12 +1,9 @@
-# 0.3.1 reproducible API contract. PyTorch is installed separately by run_all.sh.
-# Official wheels/repository interfaces were inspected; live installation was
-# not executable in the network-isolated artifact environment.
-setuptools==80.9.0
-wheel==0.45.1
+# Bootstrap profile for Linux/WSL, CPython 3.11-3.13.
+# torch==2.10.0 is installed separately from the official cu128 (or smoke CPU) index.
 numpy==2.3.5
-safetensors==0.7.0
+safetensors==0.6.2
 huggingface-hub==0.36.0
+transformers==4.57.3
 tokenizers==0.22.1
-transformers==4.57.1
 pyarrow==21.0.0
-pytest==9.0.2
+pytest==8.4.2
