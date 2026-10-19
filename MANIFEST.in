@@ -1,0 +1,19 @@
+include README.md README_ko.md LICENSE NOTICE
+recursive-include LICENSES *.txt
+recursive-include native *.hpp *.cpp CMakeLists.txt
+recursive-include docs *.md
+recursive-include tests *.py
+recursive-include examples *.json *.jsonl
+recursive-include configs *.json
+recursive-include scripts *.py
+
+recursive-include reports *.md *.json *.txt
+recursive-include data_specs *.json
+recursive-include reports_v030 *.md *.json *.log
+recursive-include examples *.md
+
+include run_all.sh run_all.ps1 requirements-auto-lock.txt
+recursive-include nanodecision2/recipes *.json
+recursive-include reports_v031 *.md *.json *.log
+
+include RUN_FIRST.txt

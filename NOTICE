@@ -1,0 +1,16 @@
+NanoDecision repository import — 0.3.1
+
+The repository's existing Apache License 2.0 in LICENSE is preserved unchanged.
+
+The NanoDecision2 0.3.1 source distribution imported into this repository was
+provided with the MIT notice reproduced in LICENSES/NanoDecision2-MIT.txt:
+Copyright (c) 2026 NanoDecision2 contributors.
+
+The imported material includes nanodecision2/, native/, scripts/, tests/,
+configs/, data_specs/, examples/, the original documentation and reports,
+and the original launchers/build configuration. The original package metadata
+continues to identify that code as MIT. Preserving the repository LICENSE
+is not intended to remove or replace the imported MIT notice.
+
+External model weights, datasets, and optional libraries have their own terms;
+they are not redistributed in this source import.

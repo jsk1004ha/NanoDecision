@@ -1,0 +1,14 @@
+{
+  "version": "0.3.0",
+  "status": "source recipe, not downloaded or quality-certified data",
+  "api_teacher": false,
+  "korean_sources": ["kornli-snli", "kornli-multinli", "klue-nli", "klue-ynat", "paws-ko", "massive-scenario"],
+  "korean_original_train_rows_simple_sum": 1074445,
+  "warning": "Includes machine-translated NLI/PAWS; original row total is not final training rows, independent Korean originals, or real workflow coverage.",
+  "laya_exposure_sources": ["ag-news", "enron-spam", "phishing", "support-queue", "msmarco"],
+  "separate_teacher_reference_track": "typed-decisions",
+  "schema": {"language": "required for language training/calibration", "label_origin": "preserve", "group_id": "same original across languages and questions"},
+  "korean_priority_example_loss_weights": {"ko": 2.0, "en": 1.0},
+  "pair_consistency": "off unless equivalence_verified pairs have been reviewed",
+  "final_evaluation": "Freeze model, tokenizer, prompts, candidate set, calibration, source groups and thresholds before test"
+}

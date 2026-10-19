@@ -1,0 +1,19 @@
+{
+  "backbone": "jhu-clsp/mmBERT-base",
+  "decision_dim": 256,
+  "decision_hops": 2,
+  "max_state_tokens_initial": 2048,
+  "max_state_tokens_later": 8192,
+  "epochs": 3,
+  "micro_batch": 4,
+  "gradient_accumulation": 16,
+  "encoder_lr": 2e-05,
+  "head_lr": 0.0001,
+  "layer_decay": 0.9,
+  "warmup_ratio": 0.05,
+  "brier_weight": 0.2,
+  "rps_weight": 0.2,
+  "bf16": true,
+  "gradient_checkpointing": true,
+  "status": "Starting configuration, NOT a measured CUDA memory/throughput result. Reduce micro_batch on OOM. CLI arguments are authoritative."
+}

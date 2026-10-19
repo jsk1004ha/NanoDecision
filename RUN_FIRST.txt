@@ -1,0 +1,20 @@
+NanoDecision2 0.3.1 / Auto5M
+
+1. WSL Ubuntu 터미널에서 이 파일과 run_all.sh가 있는 폴더를 엽니다.
+2. 실행:
+   bash run_all.sh --workdir "$HOME/nd2-runs/auto5m"
+
+Python 3.11~3.13, C++17 개발 환경, NVIDIA 드라이버, 인터넷,
+작업 디스크 여유 공간 150GiB가 필요합니다.
+Ubuntu 개발 도구가 없으면 한 번만 실행:
+   sudo apt update
+   sudo apt install -y python3-venv python3-dev build-essential libopenblas-dev
+
+학습 데이터 500만 행은 다운로드/정제 후 실제로 수량을 확인합니다.
+완료 모델: $HOME/nd2-runs/auto5m/bundle
+상태/품질: $HOME/nd2-runs/auto5m/FINAL_REPORT.json
+중단 후: 같은 소스/환경에서 위 명령을 다시 실행합니다.
+
+이 ZIP은 학습 완료 가중치가 아닌 소스입니다.
+소형 통합시험 완료, 실제 500만 행 CUDA 학습은 제작 환경에서 미실행입니다.
+README_ko.md와 reports_v031/VERIFIED.md를 확인하세요.

@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nanodecision2"
+version = "0.3.1"
+description = "Typed probabilistic decisions: pretrained encoder training, native C++ inference"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [{name = "NanoDecision2 contributors"}]
+dependencies = ["tokenizers>=0.22,<0.24"]
+
+[project.optional-dependencies]
+train = ["torch>=2.6,<3", "numpy>=1.26,<3", "safetensors>=0.4", "huggingface-hub>=0.26,<2"]
+verify = ["transformers>=4.57,<5"]
+data = ["datasets>=3,<5"]
+test = ["pytest>=8,<10"]
+auto = ["torch>=2.6,<3", "numpy>=1.26,<3", "safetensors>=0.4", "huggingface-hub>=0.26,<1", "transformers>=4.57,<5", "pyarrow>=18", "pytest>=8,<10"]
+
+[project.scripts]
+nd2 = "nanodecision2.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/jsk1004ha/NanoDecision"
+Repository = "https://github.com/jsk1004ha/NanoDecision"
+Issues = "https://github.com/jsk1004ha/NanoDecision/issues"
+
+[tool.setuptools]
+packages = ["nanodecision2"]
+include-package-data = true
+license-files = ["LICENSE", "LICENSES/NanoDecision2-MIT.txt", "NOTICE"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.setuptools.package-data]
+nanodecision2 = ["recipes/*.json"]
