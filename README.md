@@ -249,6 +249,6 @@ Julia 1·Laya 비교용 스크립트는 [`scripts/evaluate_raw.py`](scripts/eval
 
 ## 라이선스와 출처
 
-저장소에 있던 [Apache-2.0 `LICENSE`](LICENSE)는 변경하지 않았습니다. 가져온 NanoDecision2 0.3.1 배포본의 **MIT 고지**는 [`LICENSES/NanoDecision2-MIT.txt`](LICENSES/NanoDecision2-MIT.txt)에 보존했습니다. Python 패키지 메타데이터의 MIT 표기도 유지했으며, 가져온 코드의 범위는 [`NOTICE`](NOTICE)를 참고하세요.
+루트의 [Apache-2.0 `LICENSE`](LICENSE)는 그대로 유지합니다. 별도 `LICENSES/` 폴더 대신 가져온 NanoDecision2 소스의 **MIT 저작권·허락 고지 전문은 [`NOTICE`](NOTICE)에 보존**했습니다. Python 패키지 메타데이터의 MIT 표기도 유지합니다.
 
 외부 인코더·토크나이저·데이터셋은 각 원천의 이용 조건을 따릅니다. 자동 다운로드가 외부 데이터의 재배포 권한을 일괄 부여하지는 않습니다. 학습 데이터·모델 가중치·로컬 인증 정보는 이 저장소에 포함하지 않습니다.
