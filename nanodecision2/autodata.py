@@ -15,9 +15,8 @@ from pathlib import Path
 import sqlite3
 import struct
 import time
-import unicodedata
 import zlib
-from .schema import TextCodec, normalize_question, gold_target, state_text
+from .schema import TextCodec, normalize_question, gold_target, state_text, normalized_state_text
 from .multilingual import language_key
 from .data import SPLITS, digest
 from .auto_sources import PublicReader, raw_rows, convert, atomic_json, sha_file
@@ -114,12 +113,13 @@ class Store:
         if flags==1 and row.get('auto_policy',spec.get('policy'))=='train_only':flags|=8
         self.db.execute('INSERT OR IGNORE INTO groups VALUES (?,?,?)',(g,g,flags))
         root=self.find(g);self.db.execute('UPDATE groups SET flags=flags|? WHERE g=?',(flags,root))
-        state_hash=digest(unicodedata.normalize('NFKC',text).strip())
+        normalized_state=normalized_state_text(row['state'])
+        state_hash=digest(normalized_state)
         old=self.db.execute('SELECT g FROM states WHERE s=?',(state_hash,)).fetchone()
         if old:self.union(g,old[0])
         else:self.db.execute('INSERT INTO states VALUES (?,?)',(state_hash,g))
         ordered=sorted((o['description'].strip(),None if q['values'] is None else q['values'][i],target[i]) for i,o in enumerate(q['options']))
-        identity={'state':unicodedata.normalize('NFKC',text).strip(),'question':q['question'].strip(), 'type':q['type'],
+        identity={'state':normalized_state,'question':q['question'].strip(), 'type':q['type'],
                   'options':[(a,b) for a,b,c in ordered]}
         key=digest(json.dumps(identity,ensure_ascii=False,sort_keys=True))
         label=json.dumps([c for a,b,c in ordered])

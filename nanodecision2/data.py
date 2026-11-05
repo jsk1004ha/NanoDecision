@@ -5,9 +5,8 @@ import json
 import mmap
 import sqlite3
 import struct
-import unicodedata
 import zlib
-from .schema import normalize_question,gold_target,state_text,TextCodec
+from .schema import normalize_question,gold_target,state_text,normalized_state_text,TextCodec
 from .runtime import sha256
 
 SPLITS=("train","validation","temperature","conformal","test")
@@ -56,7 +55,7 @@ def prepare_cache(inputs,out,source_dir,max_state=2048,max_pair=256,seed=42):
                         if old and old[0]!=part:raise ValueError("The same group occurs in two partitions")
                         db.execute("INSERT OR IGNORE INTO groups VALUES (?,?)",(g,part))
                         state=state_text(row["state"])
-                        st=digest(unicodedata.normalize("NFKC",state).strip())
+                        st=digest(normalized_state_text(row["state"]))
                         old=db.execute("SELECT g FROM states WHERE s=?",(st,)).fetchone()
                         if old and old[0]!=g:raise ValueError("Identical normalized state has different group_id values; merge these groups first")
                         db.execute("INSERT OR IGNORE INTO states VALUES (?,?)",(st,g))
