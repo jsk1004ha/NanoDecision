@@ -1,11 +1,17 @@
 import json
 import math
+import unicodedata
 from .probability import check_distribution
 
 
 def state_text(state):
     if isinstance(state,str):return state
     return json.dumps(state,ensure_ascii=False,sort_keys=True,separators=(",",":"),allow_nan=False)
+
+
+def normalized_state_text(state):
+    """Canonical key shared by group reconciliation and cache leakage audits."""
+    return unicodedata.normalize('NFKC',state_text(state)).strip()
 
 
 def normalize_question(q):

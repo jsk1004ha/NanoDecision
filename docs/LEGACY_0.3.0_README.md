@@ -106,10 +106,16 @@ PAWS-X와 MASSIVE의 원본 ID는 언어 간 공유합니다. KorNLI와 영어 S
 python scripts/reconcile_groups.py --input data/klue-nli-train.jsonl data/klue-nli-dev.jsonl data/paws-ko-train.jsonl data/paws-ko-test.jsonl data/massive-ko-train.jsonl data/massive-ko-test.jsonl --out data/combined.jsonl --repartition-training
 ```
 
-이 명령은 SQLite에서 동일 NFC 상태를 가진 그룹을 합칩니다. 원본 train 내부의 생성 split만
+이 명령은 캐시의 중복 감사와 같은 NFKC 정규화를 사용해 동일 상태의 그룹을 합칩니다. 원본 train 내부의 생성 split만
 재배정할 수 있습니다. 공식 test/development와 충돌하면 중단합니다. 이때 test를 옮기는 대신
 어느 학습 원본을 제외할지 감사해야 합니다. 근접 중복 탐지/번역 정렬을 완성한 도구는 아닙니다.
 기존 `nd2 prepare`도 충돌 시 거부합니다. `reconcile_groups`는 파일을 합치는 선택 도구입니다.
+
+합성 확률 라벨이 포함된 그룹을 `--repartition-training`으로 재배정할 때 conformal에
+해당하면 그룹 전체를 validation으로 옮깁니다. 합성 행만 따로 옮기지 않습니다.
+이미 고정된 conformal 그룹에 합성 라벨이 있으면 출력 전에 중단하므로, 해당 행을 감사하거나
+원본 train에 한해 재배정을 명시해야 합니다. 이동한 그룹 수는 manifest에 기록합니다.
+관련 회귀 검증은 `python -m pytest -q tests/test_reconcile_groups.py`로 실행합니다.
 
 ## 5. 한국어 인코더 추가학습 — 선택 사항
 

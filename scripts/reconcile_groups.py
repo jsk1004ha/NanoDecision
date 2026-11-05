@@ -10,9 +10,8 @@ import hashlib
 import json
 from pathlib import Path
 import sqlite3
-import unicodedata
 from nanodecision2.adapters import partition_for
-from nanodecision2.schema import state_text
+from nanodecision2.schema import normalized_state_text
 from nanodecision2.runtime import sha256
 
 
@@ -23,7 +22,7 @@ def reconcile(paths,out,repartition_training=False):
     dbpath=Path(str(out)+'.audit.sqlite')
     if dbpath.exists():raise FileExistsError('Audit database already exists')
     db=sqlite3.connect(dbpath)
-    db.executescript('CREATE TABLE parent(g TEXT PRIMARY KEY,p TEXT); CREATE TABLE state(h TEXT PRIMARY KEY,g TEXT); CREATE TABLE policy(g TEXT PRIMARY KEY,part TEXT);')
+    db.executescript('CREATE TABLE parent(g TEXT PRIMARY KEY,p TEXT); CREATE TABLE state(h TEXT PRIMARY KEY,g TEXT); CREATE TABLE policy(g TEXT PRIMARY KEY,part TEXT,has_synthetic INTEGER NOT NULL DEFAULT 0);')
     def root(g):
         trail=[]
         while True:
@@ -41,7 +40,7 @@ def reconcile(paths,out,repartition_training=False):
     try:
         for r in rows():
             g=str(r['group_id']);db.execute('INSERT OR IGNORE INTO parent VALUES (?,?)',(g,g))
-            h=hashlib.sha256(unicodedata.normalize('NFC',state_text(r['state'])).strip().encode()).hexdigest()
+            h=hashlib.sha256(normalized_state_text(r['state']).encode()).hexdigest()
             existing=db.execute('SELECT g FROM state WHERE h=?',(h,)).fetchone()
             if existing:
                 a,b=root(g),root(existing[0])
@@ -58,21 +57,31 @@ def reconcile(paths,out,repartition_training=False):
             if part is None:raise ValueError('Specify explicit partitions before reconciliation')
             old=db.execute('SELECT part FROM policy WHERE g=?',(g,)).fetchone()
             if old and old[0]!=part:raise ValueError('Duplicate/origin group crosses fixed partitions; audit/remove conflicting training rows without changing the held-out source')
-            db.execute('INSERT OR IGNORE INTO policy VALUES (?,?)',(g,part))
+            db.execute('INSERT OR IGNORE INTO policy(g,part) VALUES (?,?)',(g,part))
+            if r.get('label_origin')=='teacher_distribution_synthetic':
+                db.execute('UPDATE policy SET has_synthetic=1 WHERE g=?',(g,))
+        synthetic_groups_moved=0
+        for g,part,has_synthetic in db.execute('SELECT g,part,has_synthetic FROM policy'):
+            resolved=partition_for(g,'train') if part=='reassign_train' else part
+            if has_synthetic and resolved=='conformal':
+                if part!='reassign_train':
+                    raise ValueError('Synthetic labels occur in a fixed conformal group; remove conflicting rows or explicitly repartition original training rows')
+                # The entire reconciled group moves together. Row-wise moves
+                # would leak its human-label variants across partitions.
+                resolved='validation';synthetic_groups_moved+=1
+            db.execute('UPDATE policy SET part=? WHERE g=?',(resolved,g))
         tmp=Path(str(out)+'.partial')
         with tmp.open('w',encoding='utf-8') as f:
             for r in rows():
                 g=root(str(r['group_id']));part=db.execute('SELECT part FROM policy WHERE g=?',(g,)).fetchone()[0]
                 r['original_group_id']=r['group_id'];r['group_id']=g
-                r['partition']=partition_for(g,'train') if part=='reassign_train' else part
-                # Synthetic probability labels must not certify human-label coverage.
-                if r.get('label_origin')=='teacher_distribution_synthetic' and r['partition']=='conformal':
-                    r['partition']='validation'
+                r['partition']=part
                 f.write(json.dumps(r,ensure_ascii=False)+'\n')
         tmp.replace(out);db.commit()
         groups=db.execute('SELECT count(*) FROM policy').fetchone()[0]
-        result={'rows':count,'merged_group_links':joins,'groups':groups,'inputs':{str(p):sha256(p) for p in paths},'output_sha256':sha256(out),
-                'scope':'Exact NFC-state duplicates and declared origin groups only. Translation and near-duplicate leakage require additional origin metadata/audit.'}
+        result={'rows':count,'merged_group_links':joins,'groups':groups,'synthetic_groups_moved_to_validation':synthetic_groups_moved,
+                'inputs':{str(p):sha256(p) for p in paths},'output_sha256':sha256(out),
+                'scope':'Exact NFKC-state duplicates and declared origin groups only. Translation and near-duplicate leakage require additional origin metadata/audit.'}
         out.with_suffix('.manifest.json').write_text(json.dumps(result,indent=2));return result
     finally:db.close()
 
