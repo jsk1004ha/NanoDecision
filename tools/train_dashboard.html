@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>NanoDecision · Training Observatory</title>
+  <style>
+    :root { --bg:#090d14; --surface:#111823; --surface2:#141e2b; --line:#273241; --ink:#edf4fb;
+      --muted:#92a4b6; --dim:#63788c; --mint:#55e4cb; --blue:#6db6fa; --gold:#f6c77e;
+      --violet:#aa9afb; --rose:#f28c9b; color-scheme:dark; }
+    * {box-sizing:border-box}
+    body {margin:0; font:15px/1.5 ui-sans-serif,-apple-system,BlinkMacSystemFont,"Pretendard","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+      background:radial-gradient(ellipse 800px 450px at 68% -150px,#143b49 0,transparent 72%),var(--bg);color:var(--ink)}
+    button,select {font:inherit}
+    button,select {color:var(--ink);background:#182532;border:1px solid #334557;border-radius:10px;padding:9px 12px;cursor:pointer}
+    button:hover,select:hover {border-color:#587589}
+    button:focus-visible,select:focus-visible,input:focus-visible {outline:2px solid var(--mint);outline-offset:3px}
+    .shell {width:min(1440px,calc(100% - 64px));margin:auto}
+    .top {height:80px;border-bottom:1px solid #ffffff12;display:flex;justify-content:space-between;align-items:center;gap:16px}
+    .brand {display:flex;align-items:center;gap:12px;letter-spacing:-.4px;font-weight:740;font-size:18px}
+    .brand .mark {display:grid;place-items:center;width:37px;height:37px;border:1px solid #4ac8b8;background:#163d3c;
+      border-radius:12px;color:#83f9dc;letter-spacing:-1px;font-weight:850}
+    .brand small {font-size:10px;font-weight:650;letter-spacing:1.6px;color:var(--dim);display:block;margin-top:-4px}
+    .topright {display:flex;align-items:center;gap:18px}
+    .tiny {font:600 11px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;letter-spacing:1px;color:var(--muted)}
+    .state {display:inline-flex;align-items:center;gap:9px;border:1px solid #345453;background:#10302e;border-radius:99px;
+      color:#93e7d7;font-size:12px;font-weight:750;padding:8px 13px;white-space:nowrap}
+    .state::before {content:"";width:7px;height:7px;border-radius:50%;background:var(--mint);box-shadow:0 0 12px #55e4cb96}
+    .state.off {background:#31251f;border-color:#56452e;color:#e5be8c}
+    .state.off::before {background:var(--gold);box-shadow:none}
+    .intro {display:flex;align-items:flex-end;justify-content:space-between;gap:24px;padding:47px 0 34px}
+    .eyebrow {font-size:11px;font-weight:800;letter-spacing:2.3px;color:var(--mint);margin-bottom:12px}
+    h1 {font-size:clamp(30px,3.7vw,55px);line-height:1.13;letter-spacing:-2px;margin:0;font-weight:790}
+    h1 span {color:var(--mint)}
+    .sub {max-width:700px;color:var(--muted);font-size:14px;line-height:1.8;margin:16px 0 0}
+    .hero-controls {display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:flex-end;padding-bottom:4px}
+    .refresh {background:#17433e;border-color:#256f66;color:#b3ffed;font-weight:750}
+    .refresh:hover {background:#1e544c}
+    .panel {border:1px solid var(--line);background:linear-gradient(145deg,#141e2b,#101823);border-radius:18px;min-width:0;overflow:hidden}
+    .section-head {display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:16px}
+    .section-title {font-size:16px;letter-spacing:-.5px;font-weight:780;margin:0}
+    .section-hint {font-size:12px;color:var(--dim)}
+    .pipeline {margin-bottom:18px;padding:22px 24px}
+    .stages {display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
+    .stage {border:1px solid #2a3746;background:#111a25;border-radius:12px;padding:15px 12px;min-height:85px;position:relative}
+    .stage .num {display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:7px;border:1px solid #374659;
+      color:var(--dim);font:700 11px ui-monospace,monospace;margin-bottom:11px}
+    .stage .name {display:block;font-size:12px;color:var(--muted);font-weight:720;white-space:nowrap}
+    .stage.complete {border-color:#255d56;background:#15312f}
+    .stage.complete .num {color:#a3eddb;border-color:#308877;background:#19463e}
+    .stage.running {border-color:#409b95;background:linear-gradient(125deg,#1e4f4a,#15302e);box-shadow:inset 0 0 0 1px #2c777033}
+    .stage.running .name,.stage.running .num {color:#b8fff0}
+    .stage.failed {border-color:#85414e;background:#3b212b}
+    .stage.failed .name {color:#ffb5bd}
+    .cards {display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:18px}
+    .metric {padding:21px 22px;min-height:164px;position:relative}
+    .metric::before {content:"";height:2px;width:50px;position:absolute;left:22px;top:0;background:var(--accent,var(--mint));border-radius:8px}
+    .metric .label {display:flex;justify-content:space-between;gap:8px;color:var(--muted);font-size:12px;font-weight:700}
+    .metric .value {font:740 clamp(24px,2.4vw,35px)/1.25 ui-monospace,SFMono-Regular,Consolas,monospace;letter-spacing:-1.4px;margin:21px 0 7px}
+    .metric .value small {font-size:14px;font-weight:520;letter-spacing:0;color:var(--dim)}
+    .metric .foot {font-size:12px;color:var(--dim)}
+    .track {height:5px;margin-top:13px;background:#293545;border-radius:99px;overflow:hidden}
+    .track i {display:block;height:100%;width:0;background:linear-gradient(90deg,#2a9e95,var(--mint));border-radius:99px;transition:width .5s}
+    .dash-grid {display:grid;grid-template-columns:minmax(0,1.75fr) minmax(290px,.9fr);gap:18px;margin-bottom:18px;align-items:stretch}
+    .chart-panel {padding:23px 25px 20px}
+    .chart-panel .section-head {margin-bottom:7px}
+    .legend {display:flex;align-items:center;gap:17px;flex-wrap:wrap}
+    .legend span {display:flex;align-items:center;gap:7px;font-size:11px;color:var(--muted)}
+    .legend i {width:15px;height:3px;display:inline-block;border-radius:10px;background:var(--line-color)}
+    .chart {display:block;width:100%;height:auto;overflow:visible;margin-top:18px}
+    .chart text {fill:#6f8397;font:12px ui-monospace,Consolas,monospace}
+    .chart .gridline {stroke:#263445;stroke-width:1;stroke-dasharray:3 7}
+    .chart .plot-line {fill:none;stroke-width:2.8;stroke-linejoin:round;stroke-linecap:round}
+    .chart .endpoint {stroke:#101823;stroke-width:3}
+    .chart-caption {display:flex;justify-content:space-between;gap:12px;align-items:center;color:var(--dim);font-size:12px;margin-top:5px}
+    .side {display:grid;gap:18px;grid-template-rows:1fr 1fr}
+    .side-panel {padding:23px}
+    .status-large {display:flex;align-items:center;gap:13px;font-size:17px;font-weight:750;margin:22px 0 14px}
+    .signal {width:36px;height:36px;display:grid;place-items:center;border-radius:11px;background:#1c3d39;border:1px solid #396a62;color:var(--mint);font-size:19px}
+    dl {margin:0}
+    .info-row {display:flex;justify-content:space-between;gap:18px;border-top:1px solid #293544;padding:11px 0}
+    .info-row dt {font-size:12px;color:var(--muted)}
+    .info-row dd {margin:0;text-align:right;font:640 12px ui-monospace,Consolas,monospace;color:#d7e5f1;max-width:210px;overflow-wrap:anywhere}
+    .language-scores {display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px}
+    .language {border:1px solid #304052;background:#182432;border-radius:12px;padding:15px}
+    .language .code {font:800 11px ui-monospace,monospace;letter-spacing:1.5px;color:var(--muted)}
+    .language .score {font:730 24px ui-monospace,monospace;margin:9px 0 0}
+    .language .note {font-size:11px;color:var(--dim)}
+    .bottom-grid {display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:18px;margin-bottom:18px}
+    .loop {padding:23px 24px}
+    .loop-nodes {display:grid;grid-template-columns:repeat(3,1fr);gap:11px;margin-top:25px}
+    .loop-node {padding:14px;min-height:99px;border:1px solid #2d3a48;border-radius:12px;background:#14202d}
+    .loop-node strong {display:block;font-size:12px;margin-top:6px}
+    .loop-node small {display:block;font-size:11px;color:var(--muted);margin-top:5px}
+    .loop-node b {font:760 11px ui-monospace,monospace;color:var(--mint)}
+    .loop-footer {font-size:12px;color:#90aab9;border-top:1px solid #2b3949;padding-top:14px;margin-top:16px}
+    .events {padding:24px;margin-bottom:24px}
+    .scroll {overflow-x:auto}
+    table {width:100%;border-collapse:collapse;text-align:left;font-size:12px;white-space:nowrap}
+    th {font-size:10px;letter-spacing:1.4px;text-transform:uppercase;color:var(--dim);font-weight:780;padding:12px 10px}
+    td {padding:13px 10px;color:#dbe6ee;border-top:1px solid #243240;font:580 12px ui-monospace,Consolas,monospace}
+    .tag {border-radius:6px;padding:4px 7px;font:700 10px ui-sans-serif,sans-serif;white-space:nowrap}
+    .tag.yes {background:#173e36;color:#8ae5c4}
+    .tag.no {background:#492731;color:#ffb5c2}
+    .tag.none {background:#25313f;color:#8da1b2}
+    .footer {border-top:1px solid #21303e;padding:21px 0 40px;display:flex;justify-content:space-between;gap:18px;color:var(--dim);font-size:12px}
+    .footer code {color:#a7b8c6;font-family:ui-monospace,Consolas,monospace}
+    .sr-only {position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+    @media(max-width:1100px) {.dash-grid{grid-template-columns:minmax(0,1fr)}.side{grid-template-columns:1fr 1fr;grid-template-rows:auto}.stages{grid-template-columns:repeat(3,1fr)}}
+    @media(max-width:780px) {.shell{width:min(100% - 28px,650px)}.top{height:66px}.topright .tiny{display:none}.intro{display:block;padding:35px 0 24px}.hero-controls{justify-content:flex-start;margin-top:24px}.cards{grid-template-columns:repeat(2,1fr);gap:10px}.metric{padding:18px;min-height:151px}.metric::before{left:18px}.bottom-grid,.side{grid-template-columns:1fr}.stages{grid-template-columns:repeat(2,1fr)}.loop-nodes{grid-template-columns:repeat(2,1fr)}.chart-panel,.events,.side-panel,.loop{padding:18px}.stage{min-height:78px;padding:11px}.footer{display:block}.footer span{display:block;margin-top:8px}}
+    @media(max-width:400px) {.metric .value{font-size:23px}.metric .label{font-size:11px}.stage .name{font-size:11px}.hero-controls select{max-width:160px}.brand{font-size:16px}}
+    @media(prefers-reduced-motion:reduce) {.track i{transition:none}}
+  </style>
+</head>
+<body>
+  <header class="top shell">
+    <div class="brand"><div class="mark">N²</div><div>NanoDecision<small>TRAINING OBSERVATORY</small></div></div>
+    <div class="topright"><span class="tiny">AUTO5M · 0.3.1</span><span class="state off" id="connection" role="status" aria-live="polite">연결 확인 중</span></div>
+  </header>
+  <main class="shell">
+    <section class="intro">
+      <div><div class="eyebrow">MODEL OPERATIONS / LIVE INSIGHT</div><h1>학습의 모든 스텝을<br><span>한눈에.</span></h1>
+        <p class="sub">영어 기준 학습부터 다국어 혼합학습까지. 기록된 손실, 검증 성능, 모델 선택 게이트를 학습 프로세스에 영향을 주지 않고 확인합니다.</p></div>
+      <div class="hero-controls"><label class="sr-only" for="phase">학습 구간</label><select id="phase" aria-label="학습 구간"><option value="auto">현재 단계 자동 선택</option><option value="english_reference">영어 기준 학습</option><option value="mixed_training">다국어 혼합학습</option><option value="train">개별 학습</option></select><button type="button" id="refresh" class="refresh">↻ 새로고침</button></div>
+    </section>
+    <section class="panel pipeline" aria-label="전체 학습 파이프라인">
+      <div class="section-head"><h2 class="section-title">파이프라인 진행</h2><span class="section-hint" id="pipeline-label">실행 상태 확인 중</span></div>
+      <div class="stages" id="stages"></div>
+    </section>
+    <section class="cards" aria-label="핵심 학습 지표">
+      <article class="panel metric" style="--accent:var(--mint)"><div class="label"><span>옵티마이저 스텝</span><span>01 / PROGRESS</span></div><div class="value" id="step-value">—</div><div class="foot" id="step-sub">기록 대기 중</div><div class="track"><i id="progress"></i></div></article>
+      <article class="panel metric" style="--accent:var(--blue)"><div class="label"><span>학습 손실</span><span>02 / TRAIN</span></div><div class="value" id="train-loss">—</div><div class="foot">최근 기록된 가중 평균 손실</div></article>
+      <article class="panel metric" style="--accent:var(--gold)"><div class="label"><span>검증 NLL</span><span>03 / VALIDATION</span></div><div class="value" id="val-nll">—</div><div class="foot" id="val-sub">검증 기록 대기 중</div></article>
+      <article class="panel metric" style="--accent:var(--violet)"><div class="label"><span>검증 정확도</span><span>04 / ACCURACY</span></div><div class="value" id="val-accuracy">—</div><div class="foot">Hard label이 있는 평가 문항 기준</div></article>
+    </section>
+    <div class="dash-grid">
+      <article class="panel chart-panel"><div class="section-head"><h2 class="section-title">손실 곡선</h2><span class="section-hint">OPTIMIZER STEP →</span></div>
+        <div class="legend"><span style="--line-color:var(--mint)"><i></i> Train loss</span><span style="--line-color:var(--gold)"><i></i> Validation NLL</span></div>
+        <svg viewBox="0 0 790 310" class="chart" id="loss-chart" role="img" aria-label="학습 손실과 검증 NLL, 옵티마이저 스텝 기준"></svg>
+        <div class="chart-caption"><span>손실은 낮을수록 좋습니다</span><span id="loss-caption">로그를 기다리는 중</span></div>
+      </article>
+      <div class="side">
+        <article class="panel side-panel"><div class="section-head"><h2 class="section-title">실행 상태</h2><span class="section-hint">SYSTEM</span></div>
+          <div class="status-large"><span class="signal">⟳</span><span id="phase-name">학습 기록 확인 중</span></div>
+          <dl><div class="info-row"><dt>현재 상태</dt><dd id="status">—</dd></div><div class="info-row"><dt>마지막 기록</dt><dd id="last-update">—</dd></div><div class="info-row"><dt>모델 선택 지표</dt><dd id="selection-metric">—</dd></div><div class="info-row"><dt>최고 선택 손실</dt><dd id="best-loss">—</dd></div></dl>
+        </article>
+        <article class="panel side-panel"><div class="section-head"><h2 class="section-title">언어별 검증</h2><span class="section-hint">LATEST EVAL</span></div>
+          <div class="language-scores"><div class="language"><div class="code">EN / ENGLISH</div><div class="score" id="en-nll" style="color:var(--violet)">—</div><div class="note" id="en-accuracy">NLL · 평가 대기</div></div><div class="language"><div class="code">KO / KOREAN</div><div class="score" id="ko-nll" style="color:var(--blue)">—</div><div class="note" id="ko-accuracy">NLL · 평가 대기</div></div></div>
+          <div class="info-row" style="margin-top:15px"><dt>영어 보호 게이트</dt><dd id="english-gate">—</dd></div><div class="info-row"><dt>전체 요청 게이트</dt><dd id="all-gates">—</dd></div>
+        </article>
+      </div>
+    </div>
+    <div class="bottom-grid">
+      <article class="panel chart-panel"><div class="section-head"><h2 class="section-title">언어별 검증 NLL</h2><span class="section-hint">CROSS-LANGUAGE CHECK</span></div>
+        <div class="legend"><span style="--line-color:var(--violet)"><i></i> English</span><span style="--line-color:var(--blue)"><i></i> Korean</span></div>
+        <svg viewBox="0 0 790 310" class="chart" id="language-chart" role="img" aria-label="영어 및 한국어 검증 NLL 추이"></svg><div class="chart-caption"><span>학습 데이터가 아니라 검증 데이터 기준</span><span>낮을수록 좋음</span></div>
+      </article>
+      <article class="panel loop"><div class="section-head"><h2 class="section-title">실제 학습 루프</h2><span class="section-hint">TRAINING.PY</span></div>
+        <div class="loop-nodes"><div class="loop-node"><b>01</b><strong>Batch 구성</strong><small>섞기 · 길이 정렬 · 가중치</small></div><div class="loop-node"><b>02</b><strong>Forward</strong><small>인코더 + 판단 헤드</small></div><div class="loop-node"><b>03</b><strong>Loss</strong><small>NLL · Brier · RPS · 선택적 JS</small></div><div class="loop-node"><b>04</b><strong>Backward</strong><small>Gradient 누적 · 정규화</small></div><div class="loop-node"><b>05</b><strong>Optimizer</strong><small>Clip(1.0) · LR schedule · AdamW</small></div><div class="loop-node"><b>06 ↺</b><strong>Evaluate / Save</strong><small>검증 · 게이트 · 체크포인트</small></div></div>
+        <p class="loop-footer">평가는 <code>eval_every</code> 스텝 또는 에포크 마지막에 실행됩니다. 게이트를 통과하고 선택 손실을 개선해야 <code>best</code>가 갱신됩니다. 그렇지 않으면 다음 학습 스텝으로 돌아갑니다.</p>
+      </article>
+    </div>
+    <section class="panel events"><div class="section-head"><h2 class="section-title">최근 검증 기록</h2><span class="section-hint">EVALUATION EVENTS</span></div><div class="scroll"><table><thead><tr><th>Step</th><th>Train loss</th><th>Val NLL</th><th>Accuracy</th><th>EN NLL</th><th>KO NLL</th><th>Language gate</th></tr></thead><tbody id="events"><tr><td colspan="7">평가 기록이 아직 없습니다.</td></tr></tbody></table></div></section>
+  </main>
+  <footer class="shell footer"><span>© NanoDecision · Local-only, read-only dashboard</span><span id="workdir">읽을 폴더 확인 중</span></footer>
+  <script>
+  (() => {
+    'use strict';
+    const $ = id => document.getElementById(id);
+    const names = {preflight:'환경 검사',initialize:'모델 초기화',data:'데이터 구성',english_reference:'영어 기준 학습',mixed_training:'다국어 혼합학습',finalize:'보정 · 최종 평가',train:'개별 학습'};
+    const statuses = {running:'진행 중',complete:'완료',failed:'실패',pending:'대기 중',unknown:'상태 미확인',stopped_after_requested_stage:'지정 단계에서 정지'};
+    const colors = {mint:'#55e4cb',blue:'#6db6fa',gold:'#f6c77e',violet:'#aa9afb'};
+    let snapshot = null, fetching = false;
+    const number = (value, digits=4) => Number.isFinite(value) ? value.toLocaleString('ko-KR',{minimumFractionDigits:digits,maximumFractionDigits:digits}) : '—';
+    const integer = value => Number.isFinite(value) ? Math.round(value).toLocaleString('ko-KR') : '—';
+    const percent = value => Number.isFinite(value) ? (value*100).toFixed(1)+'%' : '—';
+    function age(ts) {
+      if (!Number.isFinite(ts)) return '아직 없음';
+      const seconds = Math.max(0,Math.round(Date.now()/1000-ts));
+      if (seconds<60) return seconds+'초 전';
+      if (seconds<3600) return Math.floor(seconds/60)+'분 전';
+      return new Date(ts*1000).toLocaleString('ko-KR');
+    }
+    function lastWhere(arr,key) {for (let i=arr.length-1;i>=0;i--) if (arr[i][key]!=null) return arr[i]; return null;}
+    function gate(value) {return value==null ? '검증 전' : value ? '통과' : '미통과';}
+    function setTag(el,value) {el.textContent=gate(value);el.style.color=value==null?'#8fa6bb':value?'#78dfba':'#ff9bac';}
+    function observedBest(history,metric) {
+      const key=metric==='english_nll'?'languages':metric==='macro_language_nll'?'macro_nll':'val_nll';
+      const values=history.filter(p=>p.all_gates===true).map(p=>
+        key==='languages'?p.languages.en.nll:p[key]).filter(Number.isFinite);
+      return values.length?Math.min(...values):null;
+    }
+    function chartPoints(history) {
+      if(history.length<=1300)return history;
+      const stride=Math.ceil(history.length/1100);
+      return history.filter((p,i)=>i%stride===0||i===history.length-1||p.val_nll!=null);
+    }
+    function currentPhase() {
+      const preference=$('phase').value;
+      const key=preference==='auto' ? snapshot.selected_phase : preference;
+      return [key,snapshot.phases[key]||{history:[],expected_steps:null,complete:false}];
+    }
+    function renderStages(data) {
+      $('pipeline-label').textContent=statuses[data.pipeline_status]||data.pipeline_status||'기록 대기 중';
+      const parent=$('stages');parent.replaceChildren();
+      data.stages.forEach((stage,i)=>{
+        const el=document.createElement('div');
+        const status=['complete','running','failed'].includes(stage.status)?stage.status:'pending';
+        el.className='stage '+status;
+        const num=document.createElement('span');num.className='num';num.textContent=status==='complete'?'✓':String(i+1).padStart(2,'0');
+        const title=document.createElement('span');title.className='name';title.textContent=names[stage.name]||stage.name;
+        el.append(num,title);el.title=statuses[status];parent.append(el);
+      });
+    }
+    function chart(svg,history,series) {
+      const ns='http://www.w3.org/2000/svg';svg.replaceChildren();
+      const make=(tag,attributes={},str)=>{const node=document.createElementNS(ns,tag);Object.entries(attributes).forEach(([key,val])=>node.setAttribute(key,String(val)));if(str!=null)node.textContent=str;svg.appendChild(node);return node;};
+      const plots=series.map(line=>({color:line.color,points:history.filter(row=>Number.isFinite(line.pick(row))).map(row=>[row.step,line.pick(row)])}));
+      const all=plots.flatMap(line=>line.points);
+      if (!all.length) {make('text',{x:395,y:155,'text-anchor':'middle',fill:'#91a4b5'},'기록이 쌓이면 그래프가 표시됩니다.');return;}
+      const [W,H,L,R,T,B]=[790,310,54,19,20,39];
+      const minx=Math.min(0,...all.map(p=>p[0])); const maxx=Math.max(1,...all.map(p=>p[0]));
+      const values=all.map(p=>p[1]);let miny=Math.min(...values),maxy=Math.max(...values);
+      if (maxy===miny) {const d=Math.max(.01,Math.abs(miny)*.1);miny-=d;maxy+=d;}
+      else {const d=(maxy-miny)*.12;miny=Math.max(0,miny-d);maxy+=d;}
+      const X=x=>L+(x-minx)/(maxx-minx)*(W-L-R),Y=y=>H-B-(y-miny)/(maxy-miny)*(H-B-T);
+      for(let t=0;t<=4;t++) {
+        const y=T+(H-T-B)*t/4,value=maxy-(maxy-miny)*t/4;
+        make('line',{x1:L,y1:y,x2:W-R,y2:y,class:'gridline'});
+        make('text',{x:L-10,y:y+4,'text-anchor':'end'},value>=10?value.toFixed(1):value.toFixed(3));
+      }
+      for(let t=0;t<=4;t++) {
+        const x=L+(W-L-R)*t/4,step=minx+(maxx-minx)*t/4;
+        make('text',{x,y:H-13,'text-anchor':'middle'},step>=1000?(step/1000).toFixed(1)+'k':Math.round(step));
+      }
+      plots.forEach(line=>{
+        if (!line.points.length) return;
+        const path=line.points.map(([x,y],index)=>(index?'L':'M')+X(x).toFixed(2)+' '+Y(y).toFixed(2)).join(' ');
+        make('path',{d:path,class:'plot-line',stroke:line.color});
+        const last=line.points[line.points.length-1];make('circle',{cx:X(last[0]),cy:Y(last[1]),r:5,fill:line.color,class:'endpoint'});
+      });
+    }
+    function renderEvents(history) {
+      const rows=history.filter(p=>p.val_nll!=null).slice(-7).reverse();const body=$('events');body.replaceChildren();
+      if (!rows.length) {const row=document.createElement('tr'),cell=document.createElement('td');cell.colSpan=7;cell.textContent='검증 기록이 아직 없습니다. (검증 주기까지 기다려 주세요.)';row.appendChild(cell);body.append(row);return;}
+      rows.forEach(point=>{
+        const row=document.createElement('tr');
+        [integer(point.step),number(point.train_loss),number(point.val_nll),percent(point.val_accuracy),number(point.languages.en.nll),number(point.languages.ko.nll)].forEach(value=>{const cell=document.createElement('td');cell.textContent=value;row.append(cell);});
+        const cell=document.createElement('td'),tag=document.createElement('span');tag.className='tag '+(point.all_gates==null?'none':point.all_gates?'yes':'no');tag.textContent=gate(point.all_gates);cell.append(tag);row.append(cell);body.append(row);
+      });
+    }
+    function render() {
+      if(!snapshot)return;
+      renderStages(snapshot);
+      const [phase,data]=currentPhase(),history=data.history||[],last=history.at(-1),latestVal=lastWhere(history,'val_nll');
+      const steps=last?.step??data.reported_steps??null;
+      const target=data.expected_steps;
+      $('phase-name').textContent=names[phase]||'학습 기록 없음';
+      $('step-value').textContent=integer(steps);
+      $('step-sub').textContent=target ? `예상 총 ${integer(target)} 스텝 · ${steps!=null?Math.min(100,steps/target*100).toFixed(1):'0.0'}%` : '전체 스텝 수 정보 없음';
+      $('progress').style.width=Number.isFinite(target)&&target>0&&Number.isFinite(steps)?Math.min(100,steps/target*100)+'%':'0%';
+      $('train-loss').textContent=number(last?.train_loss);
+      $('val-nll').textContent=number(latestVal?.val_nll);
+      $('val-sub').textContent=latestVal?`${integer(latestVal.step)} 스텝에서 측정`:'아직 검증하지 않음';
+      $('val-accuracy').textContent=percent(latestVal?.val_accuracy);
+      $('status').textContent=data.complete?'완료':data.interrupted?'중단됨':snapshot.active_stage===phase&&snapshot.pipeline_status==='running'?'진행 중':history.length?'기록 존재':'대기 중';
+      $('last-update').textContent=age(data.updated);
+      $('selection-metric').textContent=data.selection_metric|| (phase==='mixed_training'?'macro_language_nll':phase==='english_reference'?'english_nll':'—');
+      $('best-loss').textContent=number(data.best_selection_loss??observedBest(history,data.selection_metric||(phase==='mixed_training'?'macro_language_nll':phase==='english_reference'?'english_nll':'nll')));
+      $('en-nll').textContent=number(latestVal?.languages.en.nll,3);
+      $('ko-nll').textContent=number(latestVal?.languages.ko.nll,3);
+      $('en-accuracy').textContent='NLL · ACC '+percent(latestVal?.languages.en.accuracy);
+      $('ko-accuracy').textContent='NLL · ACC '+percent(latestVal?.languages.ko.accuracy);
+      if(phase==='english_reference') {
+        $('english-gate').textContent='적용 안 함';$('english-gate').style.color='#8fa6bb';
+        $('all-gates').textContent='적용 안 함';$('all-gates').style.color='#8fa6bb';
+      } else {
+        setTag($('english-gate'),latestVal?.english_gate??null);setTag($('all-gates'),latestVal?.all_gates??null);
+      }
+      $('loss-caption').textContent=last?`${integer(history.length)}개 로그 포인트`:'데이터 대기 중';
+      const visible=chartPoints(history);
+      chart($('loss-chart'),visible,[{color:colors.mint,pick:p=>p.train_loss},{color:colors.gold,pick:p=>p.val_nll}]);
+      chart($('language-chart'),visible,[{color:colors.violet,pick:p=>p.languages.en.nll},{color:colors.blue,pick:p=>p.languages.ko.nll}]);
+      renderEvents(history);
+      $('workdir').textContent='SOURCE: '+snapshot.workdir;
+      $('connection').className='state';
+      $('connection').textContent=snapshot.smoke_only?'연결됨 · SMOKE':'연결됨 · READ ONLY';
+    }
+    async function refresh() {
+      if(fetching)return;fetching=true;$('refresh').disabled=true;
+      try {
+        const response=await fetch('/api/snapshot',{cache:'no-store'});
+        if(!response.ok)throw new Error('HTTP '+response.status);
+        snapshot=await response.json();render();
+      } catch(err) {
+        $('connection').className='state off';$('connection').textContent='연결 안 됨';
+        $('pipeline-label').textContent='데이터를 불러올 수 없습니다: '+err.message;
+      } finally {fetching=false;$('refresh').disabled=false;}
+    }
+    $('phase').addEventListener('change',render);
+    $('refresh').addEventListener('click',refresh);
+    refresh();setInterval(refresh,2500);
+  })();
+  </script>
+</body>
+</html>
