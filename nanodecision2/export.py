@@ -50,6 +50,7 @@ def export_bundle(model,out,source_dir=None,quantize=True,smoke_only=False,
         "model_sha256":sha256(out/"model.nd2"),"matrix_storage":"int8_rowwise" if quantize else "float32",
         "arithmetic":"float32 (optional dequantized BLAS tiles)","smoke_only":bool(smoke_only),
         "max_state_tokens":max_state_tokens,"max_pair_tokens":max_pair_tokens,
-        "provenance":provenance or {},"quality_status":"UNVERIFIED: run task evaluation; file export is not a quality result"}
+        "provenance":provenance or {},"api_contract_version":2,
+        "decision_mode":"best_candidate","abstention_default":False,"quality_status":"UNVERIFIED: run task evaluation; file export is not a quality result"}
     (out/"manifest.json").write_text(json.dumps(manifest,ensure_ascii=False,indent=2),encoding="utf-8")
     return manifest

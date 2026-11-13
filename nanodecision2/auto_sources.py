@@ -22,6 +22,8 @@ import urllib.request
 from typing import Any, Iterator
 from . import adapters as A
 from .schema import state_text
+from .source_contracts import (SOURCE_CONTRACT_VERSION, SourceContractError,
+                               select_files, metadata_files, delimited_rows)
 
 MASSIVE_URL = 'https://amazon-massive-nlu-dataset.s3.amazonaws.com/amazon-massive-dataset-1.1.tar.gz'
 
@@ -110,27 +112,6 @@ def download_url(url: str, path: Path, attempts: int = 5) -> Path:
     raise RuntimeError('Unreachable downloader state')
 
 
-def select_files(files: list[str], config: str | None, split: str,
-                 explicit: list[str] | None = None) -> list[str]:
-    """Do not accidentally mix train with test, or concatenate two source variants."""
-    candidates = [x for x in files if x.endswith(('.parquet', '.jsonl', '.jsonl.gz', '.json', '.tsv', '.tsv.gz'))]
-    if explicit:
-        return sorted(x for x in candidates if any(fnmatch.fnmatch(x, p) for p in explicit))
-    cfg = config or 'default'
-    sets = [
-        [f'{cfg}/{split}/*.parquet'],
-        [f'{cfg}/{split}-*.parquet', f'{cfg}/{split}.parquet', f'{cfg}/{split}.jsonl', f'{cfg}/{split}.json'],
-        [f'{cfg}/data/{split}-*.parquet'],
-    ]
-    if config in (None, 'default'):
-        sets += [[f'data/{split}-*.parquet'], [f'{split}-*.parquet', f'{split}.parquet', f'{split}.jsonl', f'{split}.json'],
-                 [f'{split}/*.parquet']]
-    for patterns in sets:
-        hits = sorted(x for x in candidates if any(fnmatch.fnmatch(x, p) for p in patterns))
-        if hits: return hits
-    return []
-
-
 class PublicReader:
     def __init__(self, root: Path):
         self.root = Path(root); self.root.mkdir(parents=True, exist_ok=True)
@@ -139,7 +120,8 @@ class PublicReader:
 
     def resolve(self, spec: dict) -> dict:
         key = spec['id']
-        requested = {k: spec.get(k) for k in ('repo', 'config', 'split', 'revision', 'files', 'transport', 'language', 'url')}
+        requested = {k: spec.get(k) for k in ('repo', 'config', 'split', 'revision', 'files', 'transport', 'language', 'url', 'parser', 'variant', 'nested_explicit')}
+        requested['source_contract_version'] = SOURCE_CONTRACT_VERSION
         if key in self.lock:
             if self.lock[key]['requested'] != requested:
                 raise ValueError(f'Source configuration changed: {key}. Use a new work directory.')
@@ -152,9 +134,16 @@ class PublicReader:
             from huggingface_hub import HfApi
             api = HfApi()
             repo = spec['repo']
-            revision = retry(lambda: api.dataset_info(repo, revision=spec.get('revision', 'main')).sha)
+            info = retry(lambda: api.dataset_info(repo, revision=spec.get('revision', 'main')))
+            revision = info.sha
             names = retry(lambda: api.list_repo_files(repo, repo_type='dataset', revision=revision))
-            files = select_files(names, spec.get('config'), spec['split'], spec.get('files'))
+            files = select_files(names, spec.get('config'), spec['split'], spec.get('files'),
+                                 nested_explicit=spec.get('nested_explicit', False))
+            if not files and not spec.get('files'):
+                files = metadata_files(getattr(info, 'card_data', None), names, spec.get('config'), spec['split'])
+            if not files and spec.get('files'):
+                raise SourceContractError('explicit_file_not_found',
+                    f'{repo}: requested variant is absent; no unrelated fallback allowed')
             branch = spec.get('revision', 'main')
             if not files:
                 # Hub-maintained Parquet only. No trust_remote_code workaround.
@@ -166,7 +155,8 @@ class PublicReader:
                 raise RuntimeError(f'No safe data files for {repo}/{spec.get("config")}/{spec["split"]}. '
                                    'The source schema may have changed; no substitute data was used.')
             record = {'requested': requested, 'repo': repo, 'data_revision': revision,
-                      'data_branch': branch, 'files': files}
+                      'data_branch': branch, 'files': files,
+                      'source_contract_version': SOURCE_CONTRACT_VERSION}
         self.lock[key] = record; atomic_json(self.lock_path, self.lock)
         return record
 
@@ -228,9 +218,12 @@ def raw_rows(path: Path, spec: dict, start: int = 0) -> Iterator[tuple[int, dict
         for i,row in enumerate(rows):
             if i>=start:yield i,row,None
         return
+    if str(path).endswith(('.tsv', '.tsv.gz', '.csv', '.csv.gz')):
+        yield from delimited_rows(path, spec, start)
+        return
     opener = gzip.open if str(path).endswith('.gz') else open
     with opener(path, 'rt', encoding='utf-8-sig') as f:
-        rows = csv.DictReader(f, delimiter='\t') if '.tsv' in str(path) else (json.loads(x) for x in f if x.strip())
+        rows = (json.loads(x) for x in f if x.strip())
         for i, row in enumerate(rows):
             if i >= start: yield i, row, None
 
@@ -257,7 +250,7 @@ def _pairwise(spec, index, query, positive, negative, pair_no):
         state={'query': query, 'passages': {'A': texts[0], 'B': texts[1]}},
         question='어느 문서가 질문에 대한 근거로 더 적합한가?' if ko else 'Which passage is the better supporting evidence for the query?',
         criteria={'A': 'A 문서' if ko else 'Passage A', 'B': 'B 문서' if ko else 'Passage B'},
-        target='B' if flip else 'A', derived=True, label_origin='source_positive_vs_mined_negative_not_exhaustive_relevance', weight=0.5)
+        target='B' if flip else 'A', derived=True, label_origin=spec.get('negative_provenance', 'source_positive_vs_mined_negative_not_exhaustive_relevance'), weight=0.5)
     return row
 
 
@@ -324,6 +317,8 @@ def convert(spec: dict, raw: dict, index: str, label_names=None) -> list[dict]:
             rows.append(row)
     elif kind == 'wiki_pairs':
         query = raw['query']; positives = raw['pos']; negatives = raw['neg']
+        if not isinstance(query, str) or not all(isinstance(v, list) and all(isinstance(t, str) for t in v) for v in (positives, negatives)):
+            raise SourceContractError('schema_mismatch', 'wiki_pairs requires query:string and pos/neg:list[string]')
         if not positives or not negatives: return []
         # Use different negative passages, not repeated strings or synonym prompts.
         unique = list(dict.fromkeys(t for t in negatives if t not in positives))

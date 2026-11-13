@@ -67,6 +67,7 @@ def main():
     p.add_argument("--laya-variant",choices=("multilingual","english","typed-decisions"),default="multilingual")
     p.add_argument("--probability-mode",choices=("shipped","unscaled"),default="shipped")
     p.add_argument("--warmup",type=int,default=2)
+    p.add_argument("--allow-smoke",action="store_true")
     args=p.parse_args()
     import os
     for key in ("OMP_NUM_THREADS","OPENBLAS_NUM_THREADS","MKL_NUM_THREADS"):
@@ -85,7 +86,7 @@ def main():
     if args.engine=="nd2":
         if args.device!="cpu":raise ValueError("ND2 native backend is CPU-only")
         from nanodecision2 import DecisionEngine
-        engine=DecisionEngine(args.model,require_calibration=False)
+        engine=DecisionEngine(args.model,require_calibration=False,allow_smoke=args.allow_smoke)
         def predict(row):
             spec=normalize_question(row);answer=engine.logits_row(row)
             p=[answer["probabilities"][o["id"]] for o in spec["options"]]

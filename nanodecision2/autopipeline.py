@@ -26,7 +26,7 @@ def default_recipe():
 def smoke_recipe():
     r=default_recipe()
     r.update(name='offline_fixture_ONLY',train_rows=120,
-        reserve_rows={'validation':20,'temperature':20,'conformal':20,'test':20},
+        reserve_rows={'validation':20,'temperature':20,'conformal':0,'test':40},
         disk_min_gib=0,max_state_tokens=384,max_pair_tokens=256,sources=[],smoke_only=True)
     for split in ('train','test'):
         for lang in ('en','ko','de'):
@@ -140,8 +140,8 @@ def _train(work,recipe,device,reference):
     mapping={'epochs':t['english_reference_epochs'] if reference else t['epochs'], 'batch-size':t['batch_size'],
         'accumulation':t['accumulation'],'encoder-lr':t['encoder_lr'],'head-lr':t['head_lr'],
         'eval-every':t['eval_every'],'save-every':t['save_every'],'log-every':t['log_every'],
-        'validation-limit':t['validation_limit'],'patience':t['patience'],'threads':t['threads'],'seed':recipe['seed'],
-        'selection-metric':'english_nll' if reference else 'macro_language_nll'}
+        'validation-limit':t['validation_limit'],'workers':t.get('workers',0),'prefetch':t.get('prefetch',2),'patience':t['patience'],'threads':t['threads'],'seed':recipe['seed'],
+        'selection-metric':'english_nll' if reference else t.get('selection_metric','macro_task_error')}
     for k,v in mapping.items():args+=['--'+k,str(v)]
     if reference:args+=['--train-language','en']
     else:args+=['--guard-english','--guard-korean']
@@ -172,6 +172,12 @@ def _export(work,which):
 def worker(spec):
     work=Path(spec['work']);recipe=spec['recipe'];name=spec['name'];device=spec['device']
     if name=='preflight':r=_preflight(work,recipe,device)
+    elif name=='sources':
+        if recipe.get('smoke_only'):
+            r={'status':'fixture_only','network_sources_checked':False}
+        else:
+            from .source_preflight import preflight
+            r=preflight(recipe,work)
     elif name=='initialize':r=_initialize(work,recipe)
     elif name=='data':
         from .autodata import build
@@ -189,7 +195,7 @@ def worker(spec):
         from .evaluation import calibrate_bundle
         which=name.removeprefix('calibrate_')
         r=calibrate_bundle(work/'exports'/which,work/'reports'/f'{which}-temperature.jsonl',
-            work/'reports'/f'{which}-conformal.jsonl',language_calibration=True,
+            None,language_calibration=True,
             min_bucket_groups=2 if recipe.get('smoke_only') else 200)
     else:raise ValueError('Unknown pipeline stage: '+name)
     atomic_json(work/'stage_results'/f'{name}.json',r)
@@ -261,11 +267,11 @@ class Pipeline:
         atomic_json(self.state_path,self.state)
 
     def calibrated(self,which):
-        for stage in ('export_'+which,'eval_'+which+'_temperature','eval_'+which+'_conformal','calibrate_'+which,'eval_'+which+'_validation'):
+        for stage in ('export_'+which,'eval_'+which+'_temperature','calibrate_'+which,'eval_'+which+'_validation'):
             self.stage(stage)
 
     def run(self,stop_after=None):
-        for stage in ('preflight','initialize','data','english_reference','mixed_training'):
+        for stage in ('preflight','sources','initialize','data','english_reference','mixed_training'):
             self.stage(stage)
             if stage==stop_after:
                 self.state['status']='stopped_after_requested_stage';atomic_json(self.state_path,self.state);return self.state
@@ -302,7 +308,8 @@ class Pipeline:
             'training_reports':{k:json.loads((self.work/k/'training_report.json').read_text()) for k in ('english_reference','mixed_training')},
             'english_guard_scope':'Observed accuracy and NLL on a fixed held-out validation set against this run\'s English-trained reference; Korean accuracy/NLL also must not regress. NOT a universal non-degradation guarantee or Julia/Laya result.',
             'evaluation':test,'stage_seconds':{k:v.get('seconds') for k,v in self.state['stages'].items()},
-            'optional_components_not_run':['100M-token extra MLM','Julia and Laya external benchmark'],
+            'api_contract_version':2,'decision_mode':'best_candidate','abstention_default':False,
+            'optional_components_not_run':['conformal policy','100M-token extra MLM','Julia and Laya external benchmark'],
             'next':'Use nanodecision2.DecisionEngine(bundle) for native CPU inference. Inspect quality_status before use.'}
         atomic_json(self.work/'FINAL_REPORT.json',report)
         self.state.update(status='complete',quality_status=status);atomic_json(self.state_path,self.state)
@@ -319,7 +326,7 @@ def main(argv=None):
     p.add_argument('--workdir',default='runs/auto5m');p.add_argument('--recipe')
     p.add_argument('--device',choices=('cuda','cpu'),default='cuda')
     p.add_argument('--smoke',action='store_true')
-    p.add_argument('--stop-after-stage',choices=('preflight','initialize','data','english_reference','mixed_training'))
+    p.add_argument('--stop-after-stage',choices=('preflight','sources','initialize','data','english_reference','mixed_training'))
     a=p.parse_args(argv)
     if a.smoke and a.recipe:p.error('--smoke uses its own fixture recipe')
     recipe=smoke_recipe() if a.smoke else json.loads(Path(a.recipe).read_text(encoding='utf-8')) if a.recipe else default_recipe()

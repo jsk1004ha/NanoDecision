@@ -67,7 +67,7 @@ def evaluate(bundle,cache,split,out,device='cpu',batch_size=2,parity_samples=8,l
     if manifest['provenance'].get('data_fingerprint')!=ds.manifest['fingerprint']:raise ValueError('Wrong cache for bundle')
     if limit:ds=validation_view(ds,limit,seed)
     if not len(ds):raise ValueError('Empty evaluation split')
-    engine=DecisionEngine(bundle,require_calibration=False)
+    engine=DecisionEngine(bundle,require_calibration=False,allow_smoke=manifest.get("smoke_only",False))
     # Sample across the split; don't only check an easy English first row.
     indices=sorted(set(int(x) for x in np.linspace(0,len(ds)-1,min(parity_samples,len(ds)))))
     worst=0.0

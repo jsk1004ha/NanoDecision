@@ -126,6 +126,12 @@ class CacheDataset:
         self.index=mmap.mmap(self.index_file.fileno(),0,access=mmap.ACCESS_READ) if self.length else None
         if self.length and len(self.index)!=self.length*8:raise ValueError("Corrupt cache index")
 
+    def __getstate__(self):
+        return {"root":str(self.root),"split":self.split}
+
+    def __setstate__(self,state):
+        self.__init__(state["root"],state["split"])
+
     def __len__(self):return self.length
 
     def __getitem__(self,i):
