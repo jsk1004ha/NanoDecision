@@ -134,6 +134,34 @@ def _train(work,recipe,device,reference):
     init=work/'init' if reference else work/'english_reference'/'best'
     report=out/'training_report.json'
     if report.exists() and json.loads(report.read_text()).get('completed'):return json.loads(report.read_text())
+    if t.get('trainer')=='scalable':
+        from .scalable_training import parser as scalable_parser,train as scalable_train
+        values={'init':str(init),'cache':str(work/'cache'),'out':str(out),'device':device,
+            'epochs':t['english_reference_epochs'] if reference else t['epochs'],
+            'batch-size':t['batch_size'],'accumulation':t['accumulation'],
+            'max-tokens':t.get('max_tokens',0),'encoder-lr':t['encoder_lr'],'head-lr':t['head_lr'],
+            'eval-every':t['eval_every'],'save-every':t['save_every'],'threads':t['threads'],
+            'workers':t.get('workers',0),'prefetch':t.get('prefetch',2),'seed':recipe['seed'],
+            'rdrop':t.get('rdrop',0.),'pair-consistency':t.get('pair_consistency',0.)}
+        command=[]
+        for key,value in values.items():command += ['--'+key,str(value)]
+        if reference:command += ['--train-language','en','--no-language-guard']
+        else:command += ['--protect-language','en','--protect-language','ko']
+        for key in ('bf16','gradient_checkpointing','pin_memory','fused'):
+            if t.get(key,False):command.append('--'+key.replace('_','-'))
+        if (out/'last.pt').exists():command += ['--resume',str(out/'last.pt')]
+        world=t.get('ddp_world',1)
+        if type(world)is not int or world<1:raise ValueError('Invalid ddp_world')
+        if world>1:
+            subprocess.run([sys.executable,'-m','torch.distributed.run','--standalone','--nnodes=1',
+                '--nproc-per-node='+str(world),'-m','nanodecision2.scalable_training','--ddp',*command],check=True)
+        else:
+            options=scalable_parser().parse_args(command)
+            options.protect_language=[] if reference else ['en','ko']
+            scalable_train(options)
+        result=json.loads(report.read_text())
+        if not result.get('completed'):raise RuntimeError('Scalable training is checkpointed, not complete')
+        return result
     if out.exists() and any(out.iterdir()) and not (out/'last.pt').exists():
         os.replace(out,out.with_name(out.name+'.uncheckpointed-'+str(time.time_ns())))
     args=['train','--init',str(init),'--cache',str(work/'cache'),'--out',str(out),'--device',device]
@@ -177,7 +205,7 @@ def worker(spec):
             r={'status':'fixture_only','network_sources_checked':False}
         else:
             from .source_preflight import preflight
-            r=preflight(recipe,work)
+            r=preflight(recipe,work,workers=recipe.get('source_workers',2),prefetch=recipe.get('source_prefetch',2))
     elif name=='initialize':r=_initialize(work,recipe)
     elif name=='data':
         from .autodata import build
@@ -326,10 +354,14 @@ def main(argv=None):
     p.add_argument('--workdir',default='runs/auto5m');p.add_argument('--recipe')
     p.add_argument('--device',choices=('cuda','cpu'),default='cuda')
     p.add_argument('--smoke',action='store_true')
+    p.add_argument('--training-profile',choices=('throughput64','batch128','batch256','context4k','context8k'))
     p.add_argument('--stop-after-stage',choices=('preflight','sources','initialize','data','english_reference','mixed_training'))
     a=p.parse_args(argv)
     if a.smoke and a.recipe:p.error('--smoke uses its own fixture recipe')
     recipe=smoke_recipe() if a.smoke else json.loads(Path(a.recipe).read_text(encoding='utf-8')) if a.recipe else default_recipe()
+    if a.training_profile:
+        from .training_profiles import apply_profile
+        recipe=apply_profile(recipe,a.training_profile)
     device='cpu' if a.smoke else a.device
     if a.smoke and a.workdir=='runs/auto5m':a.workdir='runs/offline_smoke031'
     work=Path(a.workdir).expanduser().resolve()

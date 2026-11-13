@@ -9,7 +9,13 @@ def main(argv=None):
     if argv and argv[0]=="auto":
         from .autopipeline import main as auto_main
         return auto_main(argv[1:])
-    p=argparse.ArgumentParser(prog="nd2",description="Native probabilistic decisions; no Jev API is required")
+    extensions={"train-scalable":"scalable_training", "probe-batch":"batch_probe",
+                "generate-verified":"verified_tasks", "train-extended":"extended_workflow", "extended":"extended_inference",
+                "jevbench":"jevbench_adapter", "predict-long":"long_context", "source-preflight":"source_preflight"}
+    if argv and argv[0] in extensions:
+        import importlib
+        return importlib.import_module("."+extensions[argv[0]],__package__).main(argv[1:])
+    p=argparse.ArgumentParser(prog="nd2",description="Native decisions. Additional commands: "+", ".join(extensions))
     sub=p.add_subparsers(dest="command",required=True)
     a=sub.add_parser("init")
     a.add_argument("--out",required=True);a.add_argument("--backbone",default="jhu-clsp/mmBERT-base")
@@ -17,6 +23,7 @@ def main(argv=None):
     a.add_argument("--skip-upstream-check",action="store_true");a.add_argument("--decision-dim",type=int,default=256)
     a=sub.add_parser("prepare")
     a.add_argument("--input",nargs="+",required=True);a.add_argument("--out",required=True);a.add_argument("--init",required=True)
+    a.add_argument("--workers",type=int,default=0);a.add_argument("--prefetch",type=int,default=2)
     a.add_argument("--max-state",type=int,default=2048);a.add_argument("--max-pair",type=int,default=256);a.add_argument("--seed",type=int,default=42)
     a=sub.add_parser("train")
     for name in ("init","cache","out"):a.add_argument("--"+name,required=True)
@@ -69,7 +76,7 @@ def main(argv=None):
             result=initialize(args.out,args.backbone,args.revision,args.smoke,args.skip_upstream_check,args.decision_dim)
         elif args.command=="prepare":
             from .data import prepare_cache
-            result=prepare_cache(args.input,args.out,args.init,args.max_state,args.max_pair,args.seed)
+            result=prepare_cache(args.input,args.out,args.init,args.max_state,args.max_pair,args.seed,args.workers,args.prefetch)
         elif args.command=="train":
             from .training import train
             result=train(args)

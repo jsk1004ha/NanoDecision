@@ -69,4 +69,8 @@ def korean_gate(candidate, reference):
 
 
 def bilingual_gate(candidate, reference):
-    return english_gate(candidate,reference) and korean_gate(candidate,reference)
+    aggregate=english_gate(candidate,reference) and korean_gate(candidate,reference)
+    if 'task_quality' in candidate and 'task_quality' in reference:
+        from .quality_gates import protected_slices
+        return aggregate and protected_slices(candidate['task_quality'],reference['task_quality'],('en','ko'))['passed']
+    return aggregate

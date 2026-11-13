@@ -9,6 +9,8 @@ from .runtime import sha256
 
 
 def write_native(model,path,quantize=True):
+    if getattr(model,"architecture_id","legacy") != "legacy":
+        raise ValueError("This optional research architecture has no legacy native exporter; use its explicit safetensors backend")
     if not model.head.use_set_context:
         raise ValueError("Set-context ablation must use the PyTorch evaluator; native graph exports full head only")
     cfg=model.cfg;items=list(model.state_dict().items())
