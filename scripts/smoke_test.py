@@ -37,7 +37,7 @@ def main():
         evaluate_cache(root/'bundle',root/'cache',part,root/(part+'.jsonl'))
     cal=calibrate_bundle(root/'bundle',root/'temperature.jsonl',root/'conformal.jsonl')
     metrics=evaluate_cache(root/'bundle',root/'cache','test',root/'test.jsonl')
-    result=DecisionEngine(root/'bundle').decide('Tests passed.',{'done':{'type':'noul','question':'Did the tests pass?'}})
+    result=DecisionEngine(root/'bundle',allow_smoke=True).decide('Tests passed.',{'done':{'type':'noul','question':'Did the tests pass?'}})
     report={'purpose':'Synthetic integration smoke test ONLY; no real model quality evidence',
             'training':training,'calibration':cal,'metrics':metrics,'prediction':result}
     (root/'report.json').write_text(json.dumps(report,indent=2))

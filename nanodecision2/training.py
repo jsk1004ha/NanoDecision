@@ -10,6 +10,7 @@ import numpy as np
 import torch
 from .train_views import training_view,validation_view,DatasetView,english_gate,korean_gate
 from .config import ModelConfig
+from .loading import row_batches
 from .model import DecisionModel
 from .data import CacheDataset,collate
 from .losses import proper_loss
@@ -57,7 +58,7 @@ def parameter_groups(model,encoder_lr,head_lr,layer_decay,weight_decay):
 
 @torch.inference_mode()
 def validate(model,dataset,device,batch_size):
-    model.eval();totals={};count=0;hard=correct=0;by_type={};by_language={}
+    model.eval();totals={};count=0;hard=correct=0;by_type={};by_language={};by_task={}
     for start in range(0,len(dataset),batch_size):
         rows=[dataset[i] for i in range(start,min(start+batch_size,len(dataset)))]
         batch={k:v.to(device) for k,v in collate(rows,model.cfg.pad_token_id).items()}
@@ -67,12 +68,18 @@ def validate(model,dataset,device,batch_size):
             count+=1;stats=by_type.setdefault(row["type"],{"n":0,"nll_sum":0.0});stats["n"]+=1;stats["nll_sum"]+=m["nll"]
             lang=language_key(row.get("language"));ls=by_language.setdefault(lang,{"count":0,"nll_sum":0.0,"correct":0,"hard_count":0})
             ls["count"]+=1;ls["nll_sum"]+=m["nll"]
-            if "correct" in m:ls["correct"]+=m["correct"];ls["hard_count"]+=1
+            if "correct" in m:
+                ls["correct"]+=m["correct"];ls["hard_count"]+=1
+                task=by_task.setdefault(row.get("task",row["type"]),{"correct":0,"count":0})
+                task["correct"]+=m["correct"];task["count"]+=1
             for key in ("nll","brier_to_target"):totals[key]=totals.get(key,0.0)+m[key]
             if "correct" in m:hard+=1;correct+=m["correct"]
     if not count:raise ValueError("Validation set is empty")
     return {**{k:v/count for k,v in totals.items()},"count":count,"hard_label_count":hard,
             "accuracy":correct/hard if hard else None,"by_type":by_type,
+            "by_task":by_task,
+            "macro_task_accuracy":sum(v["correct"]/v["count"] for v in by_task.values())/len(by_task) if by_task else None,
+            "macro_task_error":1-sum(v["correct"]/v["count"] for v in by_task.values())/len(by_task) if by_task else float("inf"),
             "by_language":{k:{**v,"nll":v["nll_sum"]/v["count"],"accuracy":v["correct"]/v["hard_count"] if v["hard_count"] else None} for k,v in by_language.items()},
             "macro_language_nll":sum(v["nll_sum"]/v["count"] for v in by_language.values())/len(by_language),
             "english_nll":by_language.get("en",{}).get("nll_sum",0)/max(1,by_language.get("en",{}).get("count",0)) if "en" in by_language else float("inf")}
@@ -80,6 +87,9 @@ def validate(model,dataset,device,batch_size):
 
 def train(args):
     # Defaults preserve 0.2 callers and checkpoint tests; new options are explicit.
+    args.workers=int(getattr(args,"workers",0))
+    args.prefetch=int(getattr(args,"prefetch",2))
+    if not 0<=args.workers<=64 or not 1<=args.prefetch<=8:raise ValueError("Invalid data loader worker/prefetch settings")
     args.language_weights=validate_language_weights(getattr(args,"language_weights",{}))
     args.pair_consistency=float(getattr(args,"pair_consistency",0.0))
     args.selection_metric=getattr(args,"selection_metric","nll")
@@ -93,7 +103,7 @@ def train(args):
     if args.validation_limit<0 or min(args.english_accuracy_drop,args.english_nll_increase)<0:
         raise ValueError("Invalid validation/guard settings")
     if not math.isfinite(args.pair_consistency) or args.pair_consistency<0:raise ValueError("Invalid pair weight")
-    if args.selection_metric not in {"nll","macro_language_nll","english_nll"}:raise ValueError("Unknown selection metric")
+    if args.selection_metric not in {"nll","macro_language_nll","english_nll","macro_task_error"}:raise ValueError("Unknown selection metric")
     torch.set_num_threads(args.threads);random.seed(args.seed);np.random.seed(args.seed);torch.manual_seed(args.seed)
     if args.device=="cuda" and not torch.cuda.is_available():raise ValueError("CUDA unavailable")
     if args.bf16 and (args.device!="cuda" or not torch.cuda.is_bf16_supported()):raise ValueError("BF16 requires supported CUDA hardware")
@@ -135,12 +145,13 @@ def train(args):
                 "language_weights","pair_consistency","selection_metric","train_language","validation_limit",
                 "guard_english","guard_korean","english_accuracy_drop","english_nll_increase","eval_every","patience")}
     signature["data_fingerprint"]=fingerprint
-    epoch=0;offset=0;step=0;best=float("inf");stale=0;guard_reference=None;guard_passed_updates=0
+    epoch=0;offset=0;step=0;best=float("inf");best_nll=float("inf");stale=0;guard_reference=None;guard_passed_updates=0
     if args.resume:
         ck=torch.load(args.resume,map_location="cpu",weights_only=True)
         if ck["signature"]!=signature:raise ValueError("Resume settings or data differ; exact optimizer resume refused")
         model.load_state_dict(ck["model"]);optimizer.load_state_dict(ck["optimizer"])
         epoch,offset,step,best,stale=(ck[k] for k in ("epoch","next_batch","step","best","stale"))
+        best_nll=ck.get("best_nll",float("inf"))
         guard_reference=ck.get("guard_reference");guard_passed_updates=ck.get("guard_passed_updates",0)
         random.setstate(ck["python_rng"]);torch.set_rng_state(ck["torch_rng"])
         if args.device=="cuda":torch.cuda.set_rng_state_all(ck["cuda_rng"])
@@ -151,7 +162,7 @@ def train(args):
     if args.guard_english and guard_reference is None:
         guard_reference=validate(model,val,args.device,args.batch_size)
         english_gate(guard_reference,guard_reference)
-        best=guard_reference[args.selection_metric]
+        best=guard_reference[args.selection_metric];best_nll=guard_reference["nll"]
         save_inference_checkpoint(model,out/"best",args.init,{**info,"selection_origin":"english_reference_fallback"})
         (out/"english_reference_metrics.json").write_text(json.dumps(guard_reference,indent=2))
     interrupted=[False]
@@ -164,7 +175,7 @@ def train(args):
             old_handlers[sig]=signal.signal(sig,request_stop)
     def snapshot(ep,next_batch):
         atomic_save({"format":"nd2-training-v1","model":model.state_dict(),"optimizer":optimizer.state_dict(),
-            "epoch":ep,"next_batch":next_batch,"step":step,"best":best,"stale":stale,"signature":signature,
+            "epoch":ep,"next_batch":next_batch,"step":step,"best":best,"best_nll":best_nll,"stale":stale,"signature":signature,
             "guard_reference":guard_reference,"guard_passed_updates":guard_passed_updates,
             "python_rng":random.getstate(),"torch_rng":torch.get_rng_state(),
             "cuda_rng":torch.cuda.get_rng_state_all() if args.device=="cuda" else []},out/"last.pt")
@@ -180,9 +191,8 @@ def train(args):
         accumulated=0;weight_sum=0.0;loss_total=0.0
         model.train()
         first=offset if ep==epoch else 0
-        for bi in range(first,batches):
-            indices=epoch_batches[bi] if epoch_batches is not None else order[bi*args.batch_size:(bi+1)*args.batch_size]
-            rows=[dataset[int(i)] for i in indices]
+        for bi,rows in row_batches(dataset,order,args.batch_size,first,epoch_batches,
+                                  args.workers,args.prefetch,args.seed+ep):
             for row in rows:
                 lang=language_key(row.get("language"));row["weight"]*=args.language_weights.get(lang,1.0)
                 e=language_exposure.setdefault(lang,{"rows":0,"effective_weight":0.0});e["rows"]+=1;e["effective_weight"]+=row["weight"]
@@ -214,8 +224,10 @@ def train(args):
                 entry["english_gate_passed"]=eligible
                 if args.guard_korean:eligible=eligible and korean_gate(result,guard_reference)
                 entry["all_requested_language_gates_passed"]=eligible
-                if eligible and result[args.selection_metric]<best-1e-8:
-                    best=result[args.selection_metric];stale=0;guard_passed_updates+=1
+                improves=result[args.selection_metric]<best-1e-8
+                tied_task=args.selection_metric=="macro_task_error" and abs(result[args.selection_metric]-best)<=1e-8 and result["nll"]<best_nll-1e-8
+                if eligible and (improves or tied_task):
+                    best=result[args.selection_metric];best_nll=result["nll"];stale=0;guard_passed_updates+=1
                     save_inference_checkpoint(model,out/"best",args.init,{**info,"selection_origin":"mixed_candidate" if args.guard_english else "validation_best"})
                 else:stale+=1
                 model.train()
@@ -229,7 +241,7 @@ def train(args):
         if stop:break
     save_inference_checkpoint(model,out/"final",args.init,info)
     report={"wall_seconds_this_invocation":time.perf_counter()-start_time,"optimizer_steps_total":step,
-        "trained_rows_this_invocation":trained_rows,
+        "trained_rows_this_invocation":trained_rows,"loader_workers":args.workers,"loader_prefetch":args.prefetch,
         "rows_per_second_this_invocation":trained_rows/max(1e-9,time.perf_counter()-start_time),
         "completed":not interrupted[0] and (step>=total_steps or stale>=args.patience),
         "interrupted":interrupted[0],"english_guard_enabled":args.guard_english,

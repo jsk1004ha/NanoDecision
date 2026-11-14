@@ -9,7 +9,13 @@ def main(argv=None):
     if argv and argv[0]=="auto":
         from .autopipeline import main as auto_main
         return auto_main(argv[1:])
-    p=argparse.ArgumentParser(prog="nd2",description="Native probabilistic decisions; no Jev API is required")
+    extensions={"train-scalable":"scalable_training", "probe-batch":"batch_probe",
+                "generate-verified":"verified_tasks", "train-extended":"extended_workflow", "extended":"extended_inference",
+                "jevbench":"jevbench_adapter", "predict-long":"long_context", "source-preflight":"source_preflight"}
+    if argv and argv[0] in extensions:
+        import importlib
+        return importlib.import_module("."+extensions[argv[0]],__package__).main(argv[1:])
+    p=argparse.ArgumentParser(prog="nd2",description="Native decisions. Additional commands: "+", ".join(extensions))
     sub=p.add_subparsers(dest="command",required=True)
     a=sub.add_parser("init")
     a.add_argument("--out",required=True);a.add_argument("--backbone",default="jhu-clsp/mmBERT-base")
@@ -17,6 +23,7 @@ def main(argv=None):
     a.add_argument("--skip-upstream-check",action="store_true");a.add_argument("--decision-dim",type=int,default=256)
     a=sub.add_parser("prepare")
     a.add_argument("--input",nargs="+",required=True);a.add_argument("--out",required=True);a.add_argument("--init",required=True)
+    a.add_argument("--workers",type=int,default=0);a.add_argument("--prefetch",type=int,default=2)
     a.add_argument("--max-state",type=int,default=2048);a.add_argument("--max-pair",type=int,default=256);a.add_argument("--seed",type=int,default=42)
     a=sub.add_parser("train")
     for name in ("init","cache","out"):a.add_argument("--"+name,required=True)
@@ -28,7 +35,7 @@ def main(argv=None):
     a.add_argument("--brier-weight",type=float,default=0.2);a.add_argument("--rps-weight",type=float,default=0.2)
     a.add_argument("--language-weights",type=json.loads,default={},help='JSON, e.g. {"ko":2,"en":1}; changes the training mixture, not the truth labels')
     a.add_argument("--pair-consistency",type=float,default=0.0,help="JS loss for explicitly reviewed bilingual pairs only")
-    a.add_argument("--selection-metric",choices=("nll","macro_language_nll","english_nll"),default="nll")
+    a.add_argument("--selection-metric",choices=("nll","macro_language_nll","english_nll","macro_task_error"),default="nll")
     a.add_argument("--train-language",choices=("en","ko"))
     a.add_argument("--validation-limit",type=int,default=0)
     a.add_argument("--guard-english",action="store_true")
@@ -38,6 +45,8 @@ def main(argv=None):
     a.add_argument("--eval-every",type=int,default=500);a.add_argument("--save-every",type=int,default=500)
     a.add_argument("--log-every",type=int,default=20);a.add_argument("--patience",type=int,default=6)
     a.add_argument("--seed",type=int,default=42);a.add_argument("--threads",type=int,default=2)
+    a.add_argument("--workers",type=int,default=0)
+    a.add_argument("--prefetch",type=int,default=2)
     a.add_argument("--bf16",action="store_true");a.add_argument("--gradient-checkpointing",action="store_true")
     a.add_argument("--resume");a.add_argument("--stop-after",type=int,default=0,help="Stop after a step without altering the planned learning-rate schedule")
     a=sub.add_parser("export")
@@ -46,15 +55,20 @@ def main(argv=None):
     for name in ("bundle","cache","out"):a.add_argument("--"+name,required=True)
     a.add_argument("--split",choices=("train","validation","temperature","conformal","test"),default="test")
     a=sub.add_parser("calibrate")
-    for name in ("bundle","temperature","conformal"):a.add_argument("--"+name,required=True)
+    for name in ("bundle","temperature"):a.add_argument("--"+name,required=True)
+    a.add_argument("--conformal",help="Optional legacy prediction-set calibration; not required for decisions")
     a.add_argument("--alpha",type=float,default=0.1)
     a.add_argument("--language-calibration",action="store_true")
     a.add_argument("--min-bucket-groups",type=int,default=200)
     a=sub.add_parser("predict")
     a.add_argument("--bundle",required=True);a.add_argument("--input",required=True)
-    a.add_argument("--min-confidence",type=float,default=0);a.add_argument("--allow-uncalibrated",action="store_true")
+    a.add_argument("--min-confidence",type=float,default=0);a.add_argument("--allow-uncalibrated",action="store_true",help="Legacy compatibility; raw probabilities are allowed by default")
+    a.add_argument("--legacy-policy",action="store_true")
+    a.add_argument("--allow-smoke",action="store_true")
     a=sub.add_parser("stdin")
-    a.add_argument("--bundle",required=True);a.add_argument("--allow-uncalibrated",action="store_true")
+    a.add_argument("--bundle",required=True);a.add_argument("--allow-uncalibrated",action="store_true",help="Legacy compatibility; raw probabilities are allowed by default")
+    a.add_argument("--legacy-policy",action="store_true")
+    a.add_argument("--allow-smoke",action="store_true")
     args=p.parse_args(argv)
     try:
         if args.command=="init":
@@ -62,7 +76,7 @@ def main(argv=None):
             result=initialize(args.out,args.backbone,args.revision,args.smoke,args.skip_upstream_check,args.decision_dim)
         elif args.command=="prepare":
             from .data import prepare_cache
-            result=prepare_cache(args.input,args.out,args.init,args.max_state,args.max_pair,args.seed)
+            result=prepare_cache(args.input,args.out,args.init,args.max_state,args.max_pair,args.seed,args.workers,args.prefetch)
         elif args.command=="train":
             from .training import train
             result=train(args)
@@ -80,16 +94,16 @@ def main(argv=None):
             result=calibrate_bundle(args.bundle,args.temperature,args.conformal,args.alpha,args.language_calibration,args.min_bucket_groups)
         else:
             from .runtime import DecisionEngine
-            engine=DecisionEngine(args.bundle,require_calibration=not args.allow_uncalibrated)
+            engine=DecisionEngine(args.bundle,require_calibration=args.legacy_policy and not args.allow_uncalibrated,legacy_policy=args.legacy_policy,allow_smoke=args.allow_smoke)
             if args.command=="stdin":
                 for line in sys.stdin:
                     try:
-                        request=json.loads(line);result=engine.decide(request["state"],request["questions"])
+                        request=json.loads(line);result=engine.decide(request["state"],request["questions"],language=request.get("language"),language_metadata={k:request[k] for k in ("state_language","question_language","candidate_languages","code_switch") if k in request})
                         print(json.dumps(result,ensure_ascii=False),flush=True)
                     except Exception as e:print(json.dumps({"error":str(e)},ensure_ascii=False),flush=True)
                 return
             request=json.loads(Path(args.input).read_text(encoding="utf-8"))
-            result=engine.decide(request["state"],request["questions"],args.min_confidence)
+            result=engine.decide(request["state"],request["questions"],args.min_confidence,language=request.get("language"),language_metadata={k:request[k] for k in ("state_language","question_language","candidate_languages","code_switch") if k in request})
         print(json.dumps(result,ensure_ascii=False,indent=2),flush=True)
     except (ValueError,RuntimeError,FileExistsError,FileNotFoundError) as e:p.exit(2,f"ERROR: {e}\n")
 

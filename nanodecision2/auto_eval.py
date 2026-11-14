@@ -67,7 +67,7 @@ def evaluate(bundle,cache,split,out,device='cpu',batch_size=2,parity_samples=8,l
     if manifest['provenance'].get('data_fingerprint')!=ds.manifest['fingerprint']:raise ValueError('Wrong cache for bundle')
     if limit:ds=validation_view(ds,limit,seed)
     if not len(ds):raise ValueError('Empty evaluation split')
-    engine=DecisionEngine(bundle,require_calibration=False)
+    engine=DecisionEngine(bundle,require_calibration=False,allow_smoke=manifest.get("smoke_only",False))
     # Sample across the split; don't only check an easy English first row.
     indices=sorted(set(int(x) for x in np.linspace(0,len(ds)-1,min(parity_samples,len(ds)))))
     worst=0.0
@@ -78,6 +78,8 @@ def evaluate(bundle,cache,split,out,device='cpu',batch_size=2,parity_samples=8,l
         native=np.asarray(engine.native.score(engine.handle,context,row['pair_ids']))
         worst=max(worst,float(np.abs(native-ours).max()))
         if not np.allclose(native,ours,atol=2e-3,rtol=2e-3):raise RuntimeError(f'Native/GPU FP32 parity failed: {worst}. Do not deploy.')
+    from .quality_gates import QualityReport
+    task_quality=QualityReport()
     acc=EvaluationAccumulator(engine.calibration.get('qhat') if engine.calibration else None);by_lang={}
     temp=out.with_name(out.name+'.partial');started=time.monotonic()
     with temp.open('w',encoding='utf-8') as f:
@@ -93,12 +95,13 @@ def evaluate(bundle,cache,split,out,device='cpu',batch_size=2,parity_samples=8,l
                     logits=z,probabilities=p,temperature_used=t,model_sha256=manifest['model_sha256'],
                     data_fingerprint=ds.manifest['fingerprint'],backend='pytorch_fp32_exact_native_weights')
                 f.write(json.dumps(result,ensure_ascii=False)+'\n')
+                task_quality.add(row,[value/t for value in z])
                 acc.add(p,row['target_probs'],row['values'],row['group_id'])
                 la=by_lang.setdefault(language_key(row.get('language')),EvaluationAccumulator())
                 la.add(p,row['target_probs'],row['values'],row['group_id'])
             if start and start%1000<batch_size:print(json.dumps({'stage':'evaluation','split':split,'rows':start,'device':device}),flush=True)
     temp.replace(out)
-    report={**acc.summary(),'by_language':{k:v.summary() for k,v in by_lang.items()},'model_sha256':manifest['model_sha256'],
+    report={**acc.summary(),'task_quality':task_quality.summary(),'by_language':{k:v.summary() for k,v in by_lang.items()},'model_sha256':manifest['model_sha256'],
             'split':split,'backend':'pytorch_fp32_exact_native_weights','device':device,'wall_seconds':time.monotonic()-started,
             'native_parity':{'samples':len(indices),'max_abs_logit_error':worst,'scope':'Sampled math check; not all-input guarantee or C++ throughput benchmark.'},
             'smoke_only':manifest.get('smoke_only',False)}

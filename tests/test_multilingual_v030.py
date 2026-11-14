@@ -130,8 +130,9 @@ def test_encoder_adaptation_export_stays_native_compatible(tmp_path):
     assert not torch.equal(old.encoder.embedding.weight,model.encoder.embedding.weight)
     src=tmp_path/'adapt'/'best';info=json.loads((src/'init.json').read_text())
     export_bundle(model,tmp_path/'bundle',src,True,True,128,128,info)
-    engine=DecisionEngine(tmp_path/'bundle');answer=engine.decide('test',{'q':{'type':'noul','question':'Done?'}},language='ko')
-    assert answer['answers']['q']['abstained']
+    engine=DecisionEngine(tmp_path/'bundle',allow_smoke=True);answer=engine.decide('test',{'q':{'type':'noul','question':'Done?'}},language='ko')
+    assert not answer['answers']['q']['abstained']
+    assert answer['answers']['q']['status']=='test_only'
 
 def test_corpus_group_leak_rejected(tmp_path):
     initialize(tmp_path/'init',smoke=True)
@@ -164,7 +165,7 @@ def test_language_calibration_runtime_and_pair_training(tmp_path):
     for part in ('temperature','conformal'):evaluate_cache(tmp_path/'bundle',tmp_path/'cache',part,tmp_path/(part+'.jsonl'))
     cal=calibrate_bundle(tmp_path/'bundle',tmp_path/'temperature.jsonl',tmp_path/'conformal.jsonl',language_calibration=True,min_bucket_groups=2)
     assert 'temperatures_by_bucket' in cal
-    engine=DecisionEngine(tmp_path/'bundle')
+    engine=DecisionEngine(tmp_path/'bundle',allow_smoke=True)
     a=engine.decide('test',{'q':{'type':'noul','question':'Done?'}},language='ko')['answers']['q']
     assert a['calibration_language']=='ko'
 
