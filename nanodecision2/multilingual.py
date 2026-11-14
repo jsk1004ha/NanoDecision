@@ -1,4 +1,4 @@
-"""Language-aware training utilities. No extra inference parameters.
+"""Language-aware training utilities. No extra inference parameters. Reviewed same-language instruction pairs are also supported.
 
 Equivalence regularization is opt-in for reviewed translations. Sharing a class
 label is NOT sufficient evidence that two arbitrary examples are equivalent.
@@ -59,8 +59,8 @@ def reviewed_pair_units(dataset):
         by_pair[pair].append((i, language_key(row.get("language"))))
     paired = []
     for entries in by_pair.values():
-        if len(entries) != 2 or entries[0][1] == entries[1][1]:
-            raise ValueError("Each approved equivalence_id must have exactly two different-language rows")
+        if len(entries) != 2:
+            raise ValueError("Each approved equivalence_id must have exactly two reviewed rows")
         paired.append(tuple(i for i, _ in entries))
     if not paired:
         raise ValueError("Pair consistency requested but no reviewed bilingual pairs exist")

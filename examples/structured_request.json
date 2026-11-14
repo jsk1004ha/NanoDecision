@@ -1,0 +1,35 @@
+{
+  "state": {
+    "modality": "table",
+    "columns": [
+      {
+        "name": "component"
+      },
+      {
+        "name": "temperature",
+        "unit": "C"
+      }
+    ],
+    "rows": [
+      {
+        "component": "A",
+        "temperature": 25
+      },
+      {
+        "component": "B",
+        "temperature": 40
+      }
+    ],
+    "ordered_rows": false
+  },
+  "questions": {
+    "q": {
+      "type": "choice",
+      "question": "Which component has the higher temperature?",
+      "criteria": {
+        "a": "Component A",
+        "b": "Component B"
+      }
+    }
+  }
+}

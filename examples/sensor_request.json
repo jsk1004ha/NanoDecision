@@ -1,0 +1,62 @@
+{
+  "state": {
+    "modality": "timeseries",
+    "channel_names": [
+      "vibration",
+      "temperature"
+    ],
+    "units": [
+      "m/s2",
+      "C"
+    ],
+    "sample_rate_hz": 10,
+    "values": [
+      [
+        0.1,
+        30
+      ],
+      [
+        0.2,
+        31
+      ],
+      [
+        1.8,
+        null
+      ],
+      [
+        0.4,
+        32
+      ]
+    ],
+    "observed_mask": [
+      [
+        true,
+        true
+      ],
+      [
+        true,
+        true
+      ],
+      [
+        true,
+        false
+      ],
+      [
+        true,
+        true
+      ]
+    ]
+  },
+  "questions": {
+    "q": {
+      "type": "choice",
+      "question": "Choose the operating state. 상태를 분류해줘.",
+      "criteria": {
+        "normal": "Normal operation / 정상",
+        "transient": "Transient event / 일시적 변화",
+        "abnormal": "Sustained abnormal state / 지속 이상"
+      },
+      "code_switch": true
+    }
+  }
+}
