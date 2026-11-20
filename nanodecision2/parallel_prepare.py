@@ -1,6 +1,7 @@
 """Bounded, ordered tokenization workers; group/split audits keep one writer."""
 from collections import deque
 from concurrent.futures import ProcessPoolExecutor
+import gzip
 import json
 import multiprocessing
 from pathlib import Path
@@ -33,7 +34,8 @@ def _encode_chunk(chunk):
 
 def source_rows(paths):
     for path in paths:
-        with open(path,encoding='utf-8') as handle:
+        opener = gzip.open if Path(path).suffix == '.gz' else open
+        with opener(path, 'rt', encoding='utf-8') as handle:
             for number, line in enumerate(handle,1):
                 if not line.strip():continue
                 try:row=json.loads(line)

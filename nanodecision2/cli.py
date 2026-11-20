@@ -11,7 +11,9 @@ def main(argv=None):
         return auto_main(argv[1:])
     extensions={"train-scalable":"scalable_training", "probe-batch":"batch_probe",
                 "generate-verified":"verified_tasks", "train-extended":"extended_workflow", "extended":"extended_inference",
-                "jevbench":"jevbench_adapter", "predict-long":"long_context", "source-preflight":"source_preflight"}
+                "jevbench":"jevbench_adapter", "predict-long":"long_context", "source-preflight":"source_preflight",
+                "predict-catalog":"catalog", "generate-grounded":"grounded_training",
+                "prepare-bitext":"bitext_training"}
     if argv and argv[0] in extensions:
         import importlib
         return importlib.import_module("."+extensions[argv[0]],__package__).main(argv[1:])

@@ -8,6 +8,8 @@ Python 학습 코드와 C++17 추론 엔진, Rust 기반 토크나이저 바인�
 
 [변경 및 사용법](docs/changes/PLAN_V1_2_IMPLEMENTATION.md) · [이번 검증](docs/changes/VALIDATION_V1_2_FOUNDATION.md) · [기존 한국어 벤치마크](benchmark.ko.md) · [English benchmark](benchmark.md)
 
+후보가 많은 분류 작업은 최대 1,000개 선택지를 한 번에 평가하거나 검색으로 후보를 줄인 뒤 판단할 수 있습니다. [본문·발화를 함께 사용하는 학습과 추론](docs/grounded-catalog.md)
+
 ## 기본 판단 계약
 
 - **Choice:** 주어진 후보 전체의 확률과 최고 확률 후보 ID를 반환합니다.

@@ -3,6 +3,9 @@ import math
 import unicodedata
 from .probability import check_distribution
 
+MAX_CHOICE_OPTIONS = 1000
+MAX_ORDERED_OPTIONS = 256
+
 
 def state_text(state):
     if isinstance(state,str):return state
@@ -37,7 +40,8 @@ def normalize_question(q):
         if not all(math.isfinite(x) for x in values) or any(b<=a for a,b in zip(values,values[1:])):
             raise ValueError("Score levels must be finite and strictly increasing")
         options=[{"id":str(i),"description":x["description"]} for i,x in enumerate(levels)]
-    if not 2<=len(options)<=256:raise ValueError("Need 2..256 options")
+    maximum=MAX_CHOICE_OPTIONS if kind=="choice" else MAX_ORDERED_OPTIONS
+    if not 2<=len(options)<=maximum:raise ValueError(f"Need 2..{maximum} {kind} options")
     if not all(isinstance(o,dict) and isinstance(o.get("id"),str) and isinstance(o.get("description"),str)
                and o["id"] and o["description"].strip() for o in options):
         raise ValueError("Options require nonempty string IDs and descriptions")
