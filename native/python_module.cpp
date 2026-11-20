@@ -41,7 +41,7 @@ static PyObject* prepare_many(PyObject*,PyObject* args){PyObject *a,*b;if(!PyArg
 static PyObject* score(PyObject*,PyObject* args){PyObject *a,*b,*c;if(!PyArg_ParseTuple(args,"OOO",&a,&b,&c))return nullptr;
     try{ModelRef m=model(a);auto& ctx=prepared(b);nd2::require(ctx.owner.get()==m.get(),"Context belongs to a different model");
         PyObject* seq=PySequence_Fast(c,"Expected list of candidates");if(!seq)throw std::runtime_error("Invalid candidates");
-        auto n=PySequence_Fast_GET_SIZE(seq);if(n<2||n>256){Py_DECREF(seq);throw std::runtime_error("Need 2..256 candidates");}
+        auto n=PySequence_Fast_GET_SIZE(seq);if(n<2||n>Py_ssize_t(nd2::MAX_CANDIDATES)){Py_DECREF(seq);throw std::runtime_error("Need 2..1000 candidates");}
         std::vector<std::vector<int>> opts;
         try{for(Py_ssize_t i=0;i<n;++i)opts.push_back(ids(PySequence_Fast_GET_ITEM(seq,i)));}catch(...){Py_DECREF(seq);throw;}
         Py_DECREF(seq);nd2::Vec out;{ReleaseGIL release;out=m->score(ctx.context,opts);}return floats(out);

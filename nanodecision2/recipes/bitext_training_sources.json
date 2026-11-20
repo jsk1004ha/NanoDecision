@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "purpose": "publisher-designated training repositories only",
+  "license": {
+    "id": "CDLA-Sharing-1.0",
+    "url": "https://cdla.dev/sharing-1-0/",
+    "sha256": "a05466574037ed4ae395a1d3425f9d3ca53036c504deff81ac67c40ae6b1304a"
+  },
+  "excluded_training_fingerprints": {
+    "normalization": "NFKC casefold; Unicode word tokens; single ASCII spaces; SHA-256 UTF-8",
+    "scope": "Only fingerprints observed in these pinned publisher training files and also present in an external held-out fingerprint set; no evaluation text or complete held-out set is packaged.",
+    "sha256": [
+      "1977ce5049bf5ecc01d50beb172f12b6a59c4a5450a8c8b87047716a65a898ca",
+      "30e0f3f1fbc141a5bd93d1bb4a0966575fefc8ed613d1724a932efc1bf1a7829",
+      "4048b6595d3d4b382c7ae8130aaf7b2cb4e1497e00c5c6bfb19339bb323e0062",
+      "5b51e3f7a8d43d75a54617be62aebcfc8cffb013872a66230763b9fcd20dcead",
+      "8325e454094e24f1ffa5719d1f9768b6499b037d6dc0fdac7751a07e1455c5df",
+      "90fc8d7aac7d0212d41312b731e557a0f4b8c2d0dc7673a3c531abd4eeb0168d",
+      "9acb6a2eee83bcb8f6feb8015816f5df915e06b4faad6e7c67c9ad3e45c1a3d9",
+      "ba8599eec11714e4431080177fa573268a52392091d634ea5eef42690f6792c5"
+    ]
+  },
+  "sources": [
+    {"domain":"retail_ecommerce","repo":"bitext/Bitext-retail-ecommerce-llm-chatbot-training-dataset","revision":"12dd624ddcd3057382b2faad661bcda1fa869491","file":"bitext-retail-ecommerce-llm-chatbot-training-dataset.csv","url":"https://huggingface.co/datasets/bitext/Bitext-retail-ecommerce-llm-chatbot-training-dataset/resolve/12dd624ddcd3057382b2faad661bcda1fa869491/bitext-retail-ecommerce-llm-chatbot-training-dataset.csv","bytes":42624013,"sha256":"13a988266fed4e2b2c1ff947a89ef220ce09b5b13ac83c4a1496c0d7b81e8127"},
+    {"domain":"retail_banking","repo":"bitext/Bitext-retail-banking-llm-chatbot-training-dataset","revision":"3e3621092fc6baaf7f53ceb6f091c60ae99acb67","file":"bitext-retail-banking-llm-chatbot-training-dataset.csv","url":"https://huggingface.co/datasets/bitext/Bitext-retail-banking-llm-chatbot-training-dataset/resolve/3e3621092fc6baaf7f53ceb6f091c60ae99acb67/bitext-retail-banking-llm-chatbot-training-dataset.csv","bytes":25520089,"sha256":"f306958595d35f3ab50b6f2c8c1fcf1ba63f9c54e4c993c9905f2856082fe67a"},
+    {"domain":"mortgage_loans","repo":"bitext/Bitext-mortgage-loans-llm-chatbot-training-dataset","revision":"4d4f331c5067e17924f3a321f1a780cf73252cc0","file":"bitext-mortgage-loans-llm-chatbot-training-dataset.csv","url":"https://huggingface.co/datasets/bitext/Bitext-mortgage-loans-llm-chatbot-training-dataset/resolve/4d4f331c5067e17924f3a321f1a780cf73252cc0/bitext-mortgage-loans-llm-chatbot-training-dataset.csv","bytes":42853180,"sha256":"2c2dc53eb938c6519f33073f874ad4c918bddda1f9b88d1623e3ce29dbe69681"},
+    {"domain":"wealth_management","repo":"bitext/Bitext-wealth-management-llm-chatbot-training-dataset","revision":"304f5dbc6f960152e5b5523d67d5c2ad9f5d264c","file":"bitext-wealth-management-llm-chatbot-training-dataset.csv","url":"https://huggingface.co/datasets/bitext/Bitext-wealth-management-llm-chatbot-training-dataset/resolve/304f5dbc6f960152e5b5523d67d5c2ad9f5d264c/bitext-wealth-management-llm-chatbot-training-dataset.csv","bytes":25851060,"sha256":"9f71b71866d3cb76cabbafceaa3222f81b75523ebf136981f89e2b070f5abbda"},
+    {"domain":"travel","repo":"bitext/Bitext-travel-llm-chatbot-training-dataset","revision":"acd6b7f0c81081ab6f2d2e284eba5c73f0342b08","file":"bitext-travel-llm-chatbot-training-dataset.csv","url":"https://huggingface.co/datasets/bitext/Bitext-travel-llm-chatbot-training-dataset/resolve/acd6b7f0c81081ab6f2d2e284eba5c73f0342b08/bitext-travel-llm-chatbot-training-dataset.csv","bytes":19679834,"sha256":"426a6c7041ef7f71a2e05f21aa09148bb2b83fca35cc8dd6e511029efc96c8ca"},
+    {"domain":"hospitality","repo":"bitext/Bitext-hospitality-llm-chatbot-training-dataset","revision":"71c9b7b8ff35f2386bd91024b4570cf3a84d0204","file":"bitext-hospitality-llm-chatbot-training-dataset.csv","url":"https://huggingface.co/datasets/bitext/Bitext-hospitality-llm-chatbot-training-dataset/resolve/71c9b7b8ff35f2386bd91024b4570cf3a84d0204/bitext-hospitality-llm-chatbot-training-dataset.csv","bytes":16155404,"sha256":"358bea7f46456539b31b40f0e3d43bbcf3210e70d6ccff798af70771fa3b15d5"},
+    {"domain":"events_ticketing","repo":"bitext/Bitext-events-ticketing-llm-chatbot-training-dataset","revision":"ad65c3955efe70899dfd5c52309b5a3bcf16c029","file":"bitext-events-ticketing-llm-chatbot-training-dataset .csv","url":"https://huggingface.co/datasets/bitext/Bitext-events-ticketing-llm-chatbot-training-dataset/resolve/ad65c3955efe70899dfd5c52309b5a3bcf16c029/bitext-events-ticketing-llm-chatbot-training-dataset%20.csv","bytes":14406070,"sha256":"969ac4f34ddf7e635887b370454109df77b009bf4418242bcd34f9ff6a9c23ea"},
+    {"domain":"insurance","repo":"bitext/Bitext-insurance-llm-chatbot-training-dataset","revision":"3ce42aaa134857c47c7ee6ad821be1d1fcf5a75b","file":"bitext-insurance-llm-chatbot-training-dataset.csv","url":"https://huggingface.co/datasets/bitext/Bitext-insurance-llm-chatbot-training-dataset/resolve/3ce42aaa134857c47c7ee6ad821be1d1fcf5a75b/bitext-insurance-llm-chatbot-training-dataset.csv","bytes":27245829,"sha256":"bab50241ddc3c4680757d791a0e64b3613d3443367d56e6c19f3ecdd063e6130"},
+    {"domain":"media","repo":"bitext/Bitext-media-llm-chatbot-training-dataset","revision":"bb75f9472beb87f75eef0679ddfaf7fb9f928144","file":"bitext-media-llm-chatbot-training-dataset.csv","url":"https://huggingface.co/datasets/bitext/Bitext-media-llm-chatbot-training-dataset/resolve/bb75f9472beb87f75eef0679ddfaf7fb9f928144/bitext-media-llm-chatbot-training-dataset.csv","bytes":15071908,"sha256":"789bbb055f979ad94601b312ef0b0ba26c1b2cc5c8d82321930db055ae581427"},
+    {"domain":"restaurants","repo":"bitext/Bitext-restaurants-llm-chatbot-training-dataset","revision":"f2f493259852a78c1873843abe6a3e4fe83e91b5","file":"bitext-restaurants-llm-chatbot-training-dataset.csv","url":"https://huggingface.co/datasets/bitext/Bitext-restaurants-llm-chatbot-training-dataset/resolve/f2f493259852a78c1873843abe6a3e4fe83e91b5/bitext-restaurants-llm-chatbot-training-dataset.csv","bytes":18887149,"sha256":"87d22448f37ec57ab99d020ef647bc8edd21364578c88221af9591e85e814c8a"},
+    {"domain":"telco","repo":"bitext/Bitext-telco-llm-chatbot-training-dataset","revision":"eacc593a96d75ec6da0887f081ff0dfc442fccab","file":"bitext-telco-llm-chatbot-training-dataset.csv","url":"https://huggingface.co/datasets/bitext/Bitext-telco-llm-chatbot-training-dataset/resolve/eacc593a96d75ec6da0887f081ff0dfc442fccab/bitext-telco-llm-chatbot-training-dataset.csv","bytes":15125807,"sha256":"0905820a880783d1a00f92d4f519488479f9eefe770cbfb5737f9462135d6c12"}
+  ]
+}

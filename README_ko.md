@@ -6,6 +6,8 @@
 
 ## 1. 실행 — Linux/WSL Ubuntu
 
+공개 학습용 Bitext 원천으로 후보 100·200·300개를 구성하거나, 한국어·영어 합성 자료로 후보 1,000개까지 학습하려면 [대규모 후보 학습과 추론 안내](docs/grounded-catalog.md)를 참고하세요.
+
 ZIP을 풀고 `run_all.sh`가 있는 `NanoDecision2` 폴더에서 실행합니다.
 
 ```bash

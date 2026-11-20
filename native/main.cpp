@@ -10,7 +10,7 @@ int main(int argc,char** argv){
             try{std::istringstream in(line);int n=0,id=0,c=0;in>>n;
                 nd2::require(in&&n>0&&n<=int(model.cfg.max_length),"Bad context length");std::vector<int> state;
                 for(int i=0;i<n;++i){in>>id;nd2::require(bool(in),"Missing context token");state.push_back(id);}
-                in>>c;nd2::require(in&&c>=2&&c<=256,"Bad candidate count");std::vector<std::vector<int>> opts;
+                in>>c;nd2::require(in&&c>=2&&c<=int(nd2::MAX_CANDIDATES),"Bad candidate count");std::vector<std::vector<int>> opts;
                 for(int j=0;j<c;++j){in>>n;nd2::require(in&&n>0&&n<=int(model.cfg.max_length),"Bad candidate length");
                     std::vector<int> row;for(int i=0;i<n;++i){in>>id;nd2::require(bool(in),"Missing candidate token");row.push_back(id);}opts.push_back(row);}
                 std::string extra;nd2::require(!(in>>extra),"Trailing input");
