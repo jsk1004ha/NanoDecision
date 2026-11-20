@@ -9,6 +9,11 @@
   "excluded_training_fingerprints": {
     "normalization": "NFKC casefold; Unicode word tokens; single ASCII spaces; SHA-256 UTF-8",
     "scope": "Only fingerprints observed in these pinned publisher training files and also present in an external held-out fingerprint set; no evaluation text or complete held-out set is packaged.",
+    "comparison_registry": {
+      "fingerprints": 8574,
+      "sha256": "75bcda34d95cac5d5ef50784b9b910024aee3c6e8a19b808d8d6ca4bfb87826a",
+      "content_packaged": false
+    },
     "sha256": [
       "1977ce5049bf5ecc01d50beb172f12b6a59c4a5450a8c8b87047716a65a898ca",
       "30e0f3f1fbc141a5bd93d1bb4a0966575fefc8ed613d1724a932efc1bf1a7829",

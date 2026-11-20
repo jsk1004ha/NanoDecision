@@ -47,6 +47,9 @@ def fixture(tmp_path):
                     "sha256": hashlib.sha256(license_path.read_bytes()).hexdigest()},
         "excluded_training_fingerprints": {
             "scope": "fixture intersection only",
+            "comparison_registry": {
+                "fingerprints": 2, "sha256": "b" * 64, "content_packaged": False,
+            },
             "sha256": [fingerprint("built in sentence")],
         },
         "sources": specs,
@@ -75,6 +78,7 @@ def test_build_is_train_only_grounded_atomic_and_reproducible(tmp_path):
     assert report["evaluation_data_fetched"] is False
     assert report["catalog"]["available_labels"] == 4
     assert report["training_exclusions"]["built_in"]["rows_removed"] == 1
+    assert report["training_exclusions"]["built_in"]["comparison_registry"]["sha256"] == "b" * 64
     assert report["training_exclusions"]["optional"]["rows_removed"] == 1
     assert len(rows) == 4 and all(row["partition"] == "train" for row in rows)
     assert all(set(row["state"]) == {"context", "utterance"} for row in rows)

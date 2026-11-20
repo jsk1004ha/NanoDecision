@@ -240,6 +240,7 @@ def build(recipe_path: Path, output: Path, source_dir: Path | None = None,
                 "built_in": {"fingerprints": len(built_in),
                     "rows_removed": stats["built_in_excluded_rows"],
                     "scope": built_in_document.get("scope"),
+                    "comparison_registry": built_in_document.get("comparison_registry"),
                     "evaluation_text_packaged": False},
                 "optional": None if heldout_sha is None else {
                     "file_sha256": heldout_sha, "fingerprints": len(heldout),
