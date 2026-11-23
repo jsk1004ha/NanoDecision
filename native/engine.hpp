@@ -139,9 +139,10 @@ class Model {
     std::unordered_map<std::string,Tensor> tensors;
     struct CacheEntry {std::vector<int> ids;Vec vector;};
     std::list<CacheEntry> cache;
+    std::mutex cache_mutex;
+    uint64_t cache_generation=0;
 public:
     Config cfg{};
-    std::mutex mutex;
     explicit Model(const std::string& path):file(path){
         Reader r{file};require(r.text(8)==std::string("NDC2BIN\0",8),"Bad model magic");
         require(r.read<uint32_t>()==1,"Unsupported model version");
@@ -249,12 +250,29 @@ public:
         Vec x=encode(ids);return {linear(x,ids.size(),t("head.key.weight")),linear(x,ids.size(),t("head.value.weight")),ids.size()};
     }
     Vec candidate(const std::vector<int>& ids){
-        for(auto it=cache.begin();it!=cache.end();++it)if(it->ids==ids){Vec v=it->vector;cache.splice(cache.begin(),cache,it);return v;}
+        uint64_t generation;
+        {
+            std::lock_guard<std::mutex> lock(cache_mutex);
+            generation=cache_generation;
+            for(auto it=cache.begin();it!=cache.end();++it)if(it->ids==ids){
+                Vec v=it->vector;cache.splice(cache.begin(),cache,it);return v;
+            }
+        }
+        // Immutable model weights and request-local activation buffers: no
+        // model-wide lock around expensive encoder work.
         Vec x=encode(ids),pooled(cfg.d,0.0f);
         for(size_t i=0;i<ids.size();++i)for(size_t j=0;j<cfg.d;++j)pooled[j]+=x[i*cfg.d+j]/float(ids.size());
         Vec v=linear(pooled,1,t("head.candidate.weight"));
-        // Candidate cache only, not full context or results. Bounded entries + IDs.
-        if(ids.size()<=1024){cache.push_front({ids,v});if(cache.size()>256)cache.pop_back();}
+        if(ids.size()<=1024){
+            std::lock_guard<std::mutex> lock(cache_mutex);
+            // clear_cache invalidates in-flight fills; do not repopulate an
+            // invalidated generation after a concurrent clear.
+            if(generation!=cache_generation)return v;
+            for(auto it=cache.begin();it!=cache.end();++it)if(it->ids==ids){
+                Vec found=it->vector;cache.splice(cache.begin(),cache,it);return found;
+            }
+            cache.push_front({ids,v});if(cache.size()>256)cache.pop_back();
+        }
         return v;
     }
     Vec score(const Context& ctx,const std::vector<std::vector<int>>& options){
@@ -285,7 +303,7 @@ public:
         Vec v=linear(set,c,t("head.set_layer.weight"),&t("head.set_layer.bias"));for(float& a:v)a=gelu(a);
         return linear(v,c,t("head.output.weight"),&t("head.output.bias"));
     }
-    void clear_cache(){cache.clear();}
+    void clear_cache(){std::lock_guard<std::mutex> lock(cache_mutex);++cache_generation;cache.clear();}
     size_t mapped_bytes()const{return file.size;}
 };
 } // namespace nd2

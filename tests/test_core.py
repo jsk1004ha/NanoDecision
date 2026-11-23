@@ -152,10 +152,11 @@ class Deny(importlib.abc.MetaPathFinder):
   if fullname.split('.')[0] in {'torch','numpy','transformers','onnxruntime','datasets'}: raise RuntimeError('Blocked '+fullname)
 sys.meta_path.insert(0,Deny())
 from nanodecision2 import DecisionEngine
-engine=DecisionEngine(sys.argv[1],require_calibration=False)
+engine=DecisionEngine(sys.argv[1],require_calibration=False,allow_smoke=True)
 result=engine.decide('status ok',{'q':{'type':'noul','question':'Is it done?'}})
 assert result['answers']['q']['smoke_only']
-assert result['answers']['q']['abstained']
+assert not result['answers']['q']['abstained']
+assert result['answers']['q']['value'] is not None
 print('native-runtime-ok')
 '''
     result=subprocess.run([sys.executable,"-c",program,str(tmp_path/"bundle")],capture_output=True,text=True,check=True)

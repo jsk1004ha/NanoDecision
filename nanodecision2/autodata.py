@@ -18,6 +18,7 @@ import time
 import zlib
 from .schema import TextCodec, normalize_question, gold_target, state_text, normalized_state_text
 from .multilingual import language_key
+from .source_contracts import SOURCE_CONTRACT_VERSION
 from .data import SPLITS, digest
 from .auto_sources import PublicReader, raw_rows, convert, atomic_json, sha_file
 
@@ -68,7 +69,7 @@ class Store:
               raw_seen INTEGER NOT NULL, stats TEXT NOT NULL);
           CREATE TABLE IF NOT EXISTS shards(source TEXT, shard INTEGER, info TEXT, PRIMARY KEY(source,shard));
         ''')
-        signature=digest(json.dumps({'recipe':recipe,'tokenizer':self.tokenizer_hash,'config':self.cfg},sort_keys=True))
+        signature=digest(json.dumps({'recipe':recipe,'tokenizer':self.tokenizer_hash,'config':self.cfg,'source_contract_version':SOURCE_CONTRACT_VERSION},sort_keys=True))
         old=self.db.execute("SELECT v FROM metadata WHERE k='signature'").fetchone()
         if old and old[0]!=signature: raise ValueError('Recipe/tokenizer changed. Resume refused; use a new work directory.')
         self.db.execute("INSERT OR IGNORE INTO metadata VALUES ('signature',?)",(signature,));self.db.commit()
@@ -241,7 +242,7 @@ class Store:
             import shutil
             shutil.rmtree(temporary)  # Dedicated generated staging directory only.
         temporary.mkdir(parents=True)
-        counts=Counter();tasks=Counter();langs=Counter();sources=Counter();origins=Counter();derived=0;total_tokens=0
+        counts=Counter({s:0 for s in SPLITS});tasks=Counter();langs=Counter();sources=Counter();origins=Counter();derived=0;total_tokens=0
         group_hash=hashlib.sha256()
         for root,part in self.db.execute('SELECT DISTINCT root,part FROM selected ORDER BY root'):
             group_hash.update((root+':'+part+'\n').encode())

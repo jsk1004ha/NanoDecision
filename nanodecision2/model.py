@@ -22,7 +22,7 @@ class EncoderLayer(nn.Module):
         self.mlp_in = nn.Linear(d, 2*f, bias=False)
         self.mlp_out = nn.Linear(f, d, bias=False)
 
-    def forward(self, x, valid):
+    def forward(self, x, valid, rotary=None):
         b, length, d = x.shape
         cfg = self.cfg
         heads = cfg.num_attention_heads
@@ -30,10 +30,12 @@ class EncoderLayer(nn.Module):
         q, k, v = self.qkv(self.attn_norm(x)).view(b, length, 3, heads, hd).permute(2, 0, 3, 1, 4).unbind(0)
         local = self.index % cfg.global_attn_every_n_layers != 0
         theta = cfg.local_rope_theta if local else cfg.global_rope_theta
-        freq = theta ** (-torch.arange(0, hd, 2, dtype=torch.float32, device=x.device) / hd)
-        phase = torch.arange(length, dtype=torch.float32, device=x.device)[:, None] * freq[None]
-        phase = torch.cat([phase, phase], -1)
-        cos, sin = phase.cos().to(q.dtype), phase.sin().to(q.dtype)
+        if rotary is None:
+            freq = theta ** (-torch.arange(0, hd, 2, dtype=torch.float32, device=x.device) / hd)
+            phase = torch.arange(length, dtype=torch.float32, device=x.device)[:, None] * freq[None]
+            phase = torch.cat([phase, phase], -1)
+            rotary = (phase.cos(), phase.sin())
+        cos, sin = (v.to(q.dtype) for v in rotary)
         def rotate(a):
             return a*cos + torch.cat([-a[..., hd//2:], a[..., :hd//2]], -1)*sin
         q, k = rotate(q), rotate(k)
@@ -70,11 +72,19 @@ class Encoder(nn.Module):
 
     def forward(self, ids, valid):
         x = self.embed_norm(self.embedding(ids))
+        rotary = {}
+        hd = self.cfg.hidden_size // self.cfg.num_attention_heads
+        for theta in {self.cfg.local_rope_theta, self.cfg.global_rope_theta}:
+            freq = theta ** (-torch.arange(0, hd, 2, dtype=torch.float32, device=x.device) / hd)
+            phase = torch.arange(ids.shape[1], dtype=torch.float32, device=x.device)[:,None] * freq[None]
+            phase = torch.cat([phase, phase], -1)
+            rotary[theta] = (phase.cos(), phase.sin())
         for layer in self.layers:
+            theta = self.cfg.local_rope_theta if layer.index % self.cfg.global_attn_every_n_layers else self.cfg.global_rope_theta
             if self.training and self.gradient_checkpointing:
-                x = checkpoint(layer, x, valid, use_reentrant=False)
+                x = checkpoint(layer, x, valid, rotary[theta], use_reentrant=False)
             else:
-                x = layer(x, valid)
+                x = layer(x, valid, rotary[theta])
         return self.final_norm(x)
 
 class DecisionHead(nn.Module):

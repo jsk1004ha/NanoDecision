@@ -22,7 +22,7 @@ def split_for(group,seed=42):
     return "test"
 
 
-def prepare_cache(inputs,out,source_dir,max_state=2048,max_pair=256,seed=42):
+def prepare_cache(inputs,out,source_dir,max_state=2048,max_pair=256,seed=42,workers=0,prefetch=2):
     out=Path(out);source=Path(source_dir)
     if out.exists() and any(out.iterdir()):raise FileExistsError("Cache directory must be new/empty")
     out.mkdir(parents=True,exist_ok=True)
@@ -40,57 +40,56 @@ def prepare_cache(inputs,out,source_dir,max_state=2048,max_pair=256,seed=42):
     handles={s:((out/(s+".jsonl")).open("wb"),(out/(s+".idx")).open("wb"),(out/(s+".lengths")).open("wb")) for s in SPLITS}
     counts={s:0 for s in SPLITS};duplicates=0;total_tokens=0;raw_count=0
     try:
-        for path in inputs:
-            with open(path,encoding="utf-8") as f:
-                for line_no,line in enumerate(f,1):
-                    if not line.strip():continue
-                    raw_count+=1
-                    try:
-                        row=json.loads(line);group=row.get("group_id")
-                        if not isinstance(group,str) or not group:raise ValueError("group_id is required; related variants must share one group")
-                        if not isinstance(row.get("id"),str) or not row["id"]:raise ValueError("A unique nonempty id is required")
-                        part=row.get("partition") or split_for(group,seed)
-                        if part not in SPLITS:raise ValueError("Invalid partition")
-                        g=digest(group);old=db.execute("SELECT part FROM groups WHERE g=?",(g,)).fetchone()
-                        if old and old[0]!=part:raise ValueError("The same group occurs in two partitions")
-                        db.execute("INSERT OR IGNORE INTO groups VALUES (?,?)",(g,part))
-                        state=state_text(row["state"])
-                        st=digest(normalized_state_text(row["state"]))
-                        old=db.execute("SELECT g FROM states WHERE s=?",(st,)).fetchone()
-                        if old and old[0]!=g:raise ValueError("Identical normalized state has different group_id values; merge these groups first")
-                        db.execute("INSERT OR IGNORE INTO states VALUES (?,?)",(st,g))
-                        spec=normalize_question(row);target=gold_target(row,spec)
-                        # Detect reordered duplicate options too; preserve labels by description.
-                        ordered=sorted((o["description"],float(p),None if spec["values"] is None else spec["values"][i])
-                                       for i,(o,p) in enumerate(zip(spec["options"],target)))
-                        identity={"state":state,"question":spec["question"],"type":spec["type"],
-                                  "options":[(a,c) for a,b,c in ordered]}
-                        signature=digest(json.dumps(identity,ensure_ascii=False,sort_keys=True))
-                        label=json.dumps([b for a,b,c in ordered])
-                        old=db.execute("SELECT target,g FROM examples WHERE signature=?",(signature,)).fetchone()
-                        if old:
-                            if old[0]!=label or old[1]!=g:raise ValueError("Conflicting duplicate target/group")
-                            duplicates+=1;continue
-                        db.execute("INSERT INTO examples VALUES (?,?,?)",(signature,label,g))
-                        db.execute("INSERT INTO ids VALUES (?)",(row["id"],))
-                        sids=codec.state(row["state"],max_state);pairs=codec.pairs(spec,max_pair)
-                        weight=float(row.get("weight",1.0))
-                        if not 0<weight<=1000000:raise ValueError("Invalid sample weight")
-                        encoded={"id":row["id"],"group_id":g,"split":part,"type":spec["type"],
-                            "state_ids":sids,"pair_ids":pairs,"target_probs":target,"values":spec["values"],
-                            "option_ids":[o["id"] for o in spec["options"]],"weight":weight,
-                            "task":row.get("task",spec["type"]),"language":row.get("language","unknown"),
-                            "source":row.get("source","unknown"),"reference_option_id":row.get("reference_option_id"),
-                            "equivalence_id":row.get("equivalence_id"),
-                            "equivalence_verified":row.get("equivalence_verified",False),
-                            "label_origin":row.get("label_origin","unspecified")}
-                        data,index,lengths=handles[part]
-                        index.write(struct.pack("<Q",data.tell()))
-                        data.write((json.dumps(encoded,ensure_ascii=False,separators=(",",":"))+"\n").encode())
-                        lengths.write(struct.pack("<I",len(sids)+sum(map(len,pairs))))
-                        total_tokens+=len(sids)+sum(map(len,pairs));counts[part]+=1
-                        if raw_count%10000==0:db.commit()
-                    except Exception as e:raise ValueError(f"{path}:{line_no}: {e}") from e
+        from .parallel_prepare import prepared_rows
+        for path,line_no,row,encoded_state,encoded_pairs in prepared_rows(inputs,source,max_state,max_pair,workers,prefetch):
+            raw_count+=1
+            try:
+                group=row.get("group_id")
+                if not isinstance(group,str) or not group:raise ValueError("group_id is required; related variants must share one group")
+                if not isinstance(row.get("id"),str) or not row["id"]:raise ValueError("A unique nonempty id is required")
+                part=row.get("partition") or split_for(group,seed)
+                if part not in SPLITS:raise ValueError("Invalid partition")
+                g=digest(group);old=db.execute("SELECT part FROM groups WHERE g=?",(g,)).fetchone()
+                if old and old[0]!=part:raise ValueError("The same group occurs in two partitions")
+                db.execute("INSERT OR IGNORE INTO groups VALUES (?,?)",(g,part))
+                state=state_text(row["state"])
+                st=digest(normalized_state_text(row["state"]))
+                old=db.execute("SELECT g FROM states WHERE s=?",(st,)).fetchone()
+                if old and old[0]!=g:raise ValueError("Identical normalized state has different group_id values; merge these groups first")
+                db.execute("INSERT OR IGNORE INTO states VALUES (?,?)",(st,g))
+                spec=normalize_question(row);target=gold_target(row,spec)
+                # Detect reordered duplicate options too; preserve labels by description.
+                ordered=sorted((o["description"],float(p),None if spec["values"] is None else spec["values"][i])
+                               for i,(o,p) in enumerate(zip(spec["options"],target)))
+                identity={"state":state,"question":spec["question"],"type":spec["type"],
+                          "options":[(a,c) for a,b,c in ordered]}
+                signature=digest(json.dumps(identity,ensure_ascii=False,sort_keys=True))
+                label=json.dumps([b for a,b,c in ordered])
+                old=db.execute("SELECT target,g FROM examples WHERE signature=?",(signature,)).fetchone()
+                if old:
+                    if old[0]!=label or old[1]!=g:raise ValueError("Conflicting duplicate target/group")
+                    duplicates+=1;continue
+                db.execute("INSERT INTO examples VALUES (?,?,?)",(signature,label,g))
+                db.execute("INSERT INTO ids VALUES (?)",(row["id"],))
+                sids=encoded_state if encoded_state is not None else codec.state(row["state"],max_state)
+                pairs=encoded_pairs if encoded_pairs is not None else codec.pairs(spec,max_pair)
+                weight=float(row.get("weight",1.0))
+                if not 0<weight<=1000000:raise ValueError("Invalid sample weight")
+                encoded={"id":row["id"],"group_id":g,"split":part,"type":spec["type"],
+                    "state_ids":sids,"pair_ids":pairs,"target_probs":target,"values":spec["values"],
+                    "option_ids":[o["id"] for o in spec["options"]],"weight":weight,
+                    "task":row.get("task",spec["type"]),"language":row.get("language","unknown"),
+                    "source":row.get("source","unknown"),"reference_option_id":row.get("reference_option_id"),
+                    "equivalence_id":row.get("equivalence_id"),
+                    "equivalence_verified":row.get("equivalence_verified",False),
+                    "label_origin":row.get("label_origin","unspecified")}
+                data,index,lengths=handles[part]
+                index.write(struct.pack("<Q",data.tell()))
+                data.write((json.dumps(encoded,ensure_ascii=False,separators=(",",":"))+"\n").encode())
+                lengths.write(struct.pack("<I",len(sids)+sum(map(len,pairs))))
+                total_tokens+=len(sids)+sum(map(len,pairs));counts[part]+=1
+                if raw_count%10000==0:db.commit()
+            except Exception as e:raise ValueError(f"{path}:{line_no}: {e}") from e
         db.commit()
         group_hash=hashlib.sha256()
         for g,part in db.execute("SELECT g,part FROM groups ORDER BY g"):
@@ -125,6 +124,12 @@ class CacheDataset:
         self.data=mmap.mmap(self.file.fileno(),0,access=mmap.ACCESS_READ) if self.length else None
         self.index=mmap.mmap(self.index_file.fileno(),0,access=mmap.ACCESS_READ) if self.length else None
         if self.length and len(self.index)!=self.length*8:raise ValueError("Corrupt cache index")
+
+    def __getstate__(self):
+        return {"root":str(self.root),"split":self.split}
+
+    def __setstate__(self,state):
+        self.__init__(state["root"],state["split"])
 
     def __len__(self):return self.length
 

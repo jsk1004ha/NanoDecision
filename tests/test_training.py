@@ -47,7 +47,7 @@ def test_full_training_native_calibration(project):
         evaluate_cache(project/"bundle",project/"cache",part,project/(part+".jsonl"))
     calibrated=calibrate_bundle(project/"bundle",project/"temperature.jsonl",project/"conformal.jsonl")
     assert calibrated["conformal_groups"]==12
-    engine=DecisionEngine(project/"bundle")
+    engine=DecisionEngine(project/"bundle",allow_smoke=True)
     result=engine.decide("Tests passed",{"done":{"type":"noul","question":"Did the tests pass?"}})
     assert result["answers"]["done"]["calibrated"]
     assert report["optimizer_steps_total"]==8

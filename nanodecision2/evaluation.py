@@ -7,7 +7,7 @@ from .multilingual import language_key,probability_bucket,served_temperature
 
 
 def evaluate_cache(bundle,cache,split,out):
-    engine=DecisionEngine(bundle,require_calibration=False);dataset=CacheDataset(cache,split)
+    engine=DecisionEngine(bundle,require_calibration=False,allow_smoke=True);dataset=CacheDataset(cache,split)
     dataset.verify();fingerprint=dataset.manifest["fingerprint"]
     train_fp=engine.manifest["provenance"].get("data_fingerprint")
     if train_fp and train_fp!=fingerprint:raise ValueError("Different dataset fingerprint: audit cross-dataset leakage before evaluation")
@@ -49,12 +49,12 @@ def read_predictions(path):
     with open(path,encoding="utf-8") as f:return [json.loads(line) for line in f if line.strip()]
 
 
-def calibrate_bundle(bundle,temperature_path,conformal_path,alpha=0.1,language_calibration=False,min_bucket_groups=200):
+def calibrate_bundle(bundle,temperature_path,conformal_path=None,alpha=0.1,language_calibration=False,min_bucket_groups=200):
     bundle=Path(bundle);manifest=json.loads((bundle/"manifest.json").read_text())
     model_hash=sha256(bundle/"model.nd2")
     if manifest["model_sha256"]!=model_hash:raise ValueError("Model modified after export")
-    temp=read_predictions(temperature_path);conf=read_predictions(conformal_path)
-    if not temp or not conf:raise ValueError("Both calibration sets must be nonempty")
+    temp=read_predictions(temperature_path);conf=read_predictions(conformal_path) if conformal_path else []
+    if not temp or (conformal_path and not conf):raise ValueError("Supplied calibration sets must be nonempty")
     expected_fp=manifest.get("provenance",{}).get("data_fingerprint")
     for name,rows in (("temperature",temp),("conformal",conf)):
         for r in rows:
@@ -80,6 +80,13 @@ def calibrate_bundle(bundle,temperature_path,conformal_path,alpha=0.1,language_c
                 table[key]={**value,"independent_groups":n_groups}
         fitted.update(temperatures_by_bucket=table,bucket_group_counts=counts,
                       min_bucket_groups=min_bucket_groups,language_source="Explicit row/API metadata, not confidence-based language guessing")
+    if conformal_path is None:
+        result={**fitted,"model_sha256":model_hash,"method":"temperature_only",
+            "api_contract_version":2,"abstention_default":False,
+            "temperature_input_sha256":sha256(temperature_path),
+            "caveat":"Calibration is not a per-input correctness guarantee."}
+        (bundle/"calibration.json").write_text(json.dumps(result,indent=2))
+        return result
     # One nonconformity score per source group. Using the maximum avoids
     # treating correlated questions from one state as independent calibration data.
     groups={}
