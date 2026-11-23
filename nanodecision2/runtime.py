@@ -65,8 +65,13 @@ class DecisionEngine:
         if not 0 <= min_confidence <= 1:
             raise ValueError('min_confidence must lie in [0,1]')
         spec = normalize_question(question)
-        key = json.dumps(spec, ensure_ascii=False, sort_keys=True, allow_nan=False)
-        pairs = self._pair_cache(key)
+        if len(spec['options']) <= 256:
+            key = json.dumps(spec, ensure_ascii=False, sort_keys=True, allow_nan=False)
+            pairs = self._pair_cache(key)
+        else:
+            # A single wide request can hold hundreds of thousands of token IDs.
+            # Score it without keeping its full tokenization in the per-engine LRU.
+            pairs = self.codec.pairs(spec, self.manifest['max_pair_tokens'])
         logits = self.native.score(self.handle, prepared, pairs)
         lang = calibration_language(question, language, language_metadata)
         temperature = served_temperature(self.calibration, lang, spec['type'], len(spec['options']))

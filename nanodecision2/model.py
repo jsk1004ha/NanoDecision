@@ -129,6 +129,12 @@ class DecisionModel(nn.Module):
         self.encoder = Encoder(cfg)
         self.head = DecisionHead(cfg)
 
+    def _encode_candidates(self, ids, mask):
+        hidden = self.encoder(ids, mask)
+        weights = mask[..., None]
+        pooled = (hidden * weights).sum(1) / weights.sum(1).clamp_min(1)
+        return self.head.candidate(pooled)
+
     def forward(self, state_ids, state_mask, pair_ids, pair_mask, option_mask, state_index=None):
         # state_ids can contain U unique states for B decision questions.
         context = self.encoder(state_ids, state_mask)
@@ -137,11 +143,23 @@ class DecisionModel(nn.Module):
             keys, values = keys[state_index], values[state_index]
             state_mask = state_mask[state_index]
         b, c, length = pair_ids.shape
-        hidden = self.encoder(pair_ids.reshape(b*c, length), pair_mask.reshape(b*c, length))
-        m = pair_mask.reshape(b*c, length)[..., None]
-        pooled = (hidden*m).sum(1) / m.sum(1).clamp_min(1)
-        candidates = self.head.candidate(pooled).view(b, c, -1)
-        return self.head(keys, values, state_mask, candidates, option_mask)
+        ids = pair_ids.reshape(b*c, length)
+        mask = pair_mask.reshape(b*c, length)
+        if c <= 256:
+            candidates = self._encode_candidates(ids, mask)
+        else:
+            # Only the independent pair encodings can be split. Keep one global
+            # competition across all candidates in the head and in the loss.
+            chunk_size = max(1, min(64, 2048 // length))
+            chunks = []
+            for chunk_ids, chunk_mask in zip(ids.split(chunk_size), mask.split(chunk_size)):
+                if self.training and torch.is_grad_enabled():
+                    vectors = checkpoint(self._encode_candidates, chunk_ids, chunk_mask, use_reentrant=False)
+                else:
+                    vectors = self._encode_candidates(chunk_ids, chunk_mask)
+                chunks.append(vectors)
+            candidates = torch.cat(chunks, dim=0)
+        return self.head(keys, values, state_mask, candidates.view(b, c, -1), option_mask)
 
     def load_hf_encoder(self, state):
         target = {}

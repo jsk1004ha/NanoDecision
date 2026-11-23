@@ -29,6 +29,7 @@
 #endif
 namespace nd2 {
 using Vec = std::vector<float>;
+constexpr size_t MAX_CANDIDATES=1000;
 inline void require(bool yes, const std::string& why) { if (!yes) throw std::runtime_error(why); }
 struct MappedFile {
     const uint8_t* data=nullptr; size_t size=0;
@@ -276,7 +277,7 @@ public:
         return v;
     }
     Vec score(const Context& ctx,const std::vector<std::vector<int>>& options){
-        require(options.size()>=2&&options.size()<=256,"Need 2..256 options");
+        require(options.size()>=2&&options.size()<=MAX_CANDIDATES,"Need 2..1000 options");
         size_t c=options.size(),h=cfg.h,n=ctx.length;
         require(n>0&&ctx.keys.size()==n*h&&ctx.values.size()==n*h,"Invalid prepared context");
         Vec original(c*h),q;
